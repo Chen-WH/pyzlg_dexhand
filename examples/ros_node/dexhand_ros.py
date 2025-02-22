@@ -77,6 +77,15 @@ class JointMapping:
 
         return command
 
+    def map_feedback(self, hardware_values: Dict[str, float]) -> Dict[str, float]:
+        """Map hardware joint values to URDF joint values"""
+        joint_state_dict = {}
+        for urdf_joint in self.joint_names:
+            dex_joint = self.urdf_to_hw.get(urdf_joint)
+            if dex_joint in hardware_values:
+                joint_state_dict[urdf_joint] = float(np.deg2rad(hardware_values[dex_joint]))
+        return joint_state_dict
+
 
 class DexHandNode(ROSNode):
     """ROS2 Node for controlling one or both DexHands"""
@@ -126,11 +135,11 @@ class DexHandNode(ROSNode):
         self.kalman_filters = {}
         self.last_joint_positions = {}
         self.fingertip_mapping = {
-            'th': 0,  # Thumb
-            'ff': 1,  # Index
-            'mf': 2,  # Middle
-            'rf': 3,  # Ring
-            'lf': 4,  # Pinky
+            "th": 0,  # Thumb
+            "ff": 1,  # Index
+            "mf": 2,  # Middle
+            "rf": 3,  # Ring
+            "lf": 4,  # Pinky
         }
 
         for hand in hands:
@@ -155,25 +164,26 @@ class DexHandNode(ROSNode):
                     # Parameters for Kalman filter: dt, process_noise_var, measurement_noise_var, damping
                     self.kalman_filters[hand][joint_name] = DampedVelocityKalmanFilter(
                         dt=self.feedback_dt,
-                        process_noise_var=1.,
+                        process_noise_var=1.0,
                         measurement_noise_var=0.1,
-                        damping=0.9
+                        damping=0.9,
                     )
                     self.last_joint_positions[hand][joint_name] = 0.0
 
         # Initialize command subscriber with configurable topic
-        self.create_subscription(
-            JointState, self.command_topic, self.command_callback
-        )
+        self.create_subscription(JointState, self.command_topic, self.command_callback)
 
         # Initialize reset service
         self.create_service(Trigger, "reset_hands", self.reset_callback)
 
         # Initialize publishers for feedback
         if self.enable_feedback:
-            self.joint_state_pub = self.create_publisher(JointState, self.joint_feedback_topic, 10)
-            self.touch_sensor_pub = self.create_publisher(Float32MultiArray, self.touch_feedback_topic, 10)
-
+            self.joint_state_pub = self.create_publisher(
+                JointState, self.joint_feedback_topic, 10
+            )
+            self.touch_sensor_pub = self.create_publisher(
+                Float32MultiArray, self.touch_feedback_topic, 10
+            )
 
         # Set up command sending timer
         period = 1.0 / send_rate
@@ -259,46 +269,36 @@ class DexHandNode(ROSNode):
             # Get feedback from hand
             feedback = self.hands[hand].get_feedback()
 
-            # Create joint state message
-            joint_state_msg = JointState()
-            joint_state_msg.header.stamp = self.get_ros_time().to_msg()
-
             # Process joint positions and estimate velocities
+            pos_dict = {}
+            vel_dict = {}
             for joint_name, joint_feedback in feedback.joints.items():
                 # Get position
                 position = joint_feedback.angle
 
-                # Skip update if position is NaN
-                if np.isnan(position):
-                    continue
-
-                # Convert to radians for ROS
-                position_rad = np.deg2rad(position)
-
                 # Update the Kalman filter with new measurement
-                kalman_filter = self.kalman_filters[hand][joint_name]
-                kalman_filter.update(position)
+                if not np.isnan(position):
+                    kalman_filter = self.kalman_filters[hand][joint_name]
+                    kalman_filter.step(position)
                 state = kalman_filter.get_current_state()
 
                 # Extract position (state[0]) and velocity (state[1])
                 velocity = state[1][0]  # Extract velocity in deg/s
-                velocity_rad = np.deg2rad(velocity)  # Convert to rad/s for ROS
 
-                # Map to URDF joint names (one hardware joint may map to multiple URDF joints)
-                urdf_joints = []
-                for mapping in HardwareMapping:
-                    if mapping.value[0] == joint_name:
-                        hw_joint, urdf_joint_list = mapping.value
-                        for urdf_joint in urdf_joint_list:
-                            urdf_joints.append(f"{self.joint_mappings[hand].prefix}_{urdf_joint}")
+                # Save position and velocity to dictionaries
+                pos_dict[joint_name] = position
+                vel_dict[joint_name] = velocity
 
-                # Add each URDF joint to the message
-                for urdf_joint in urdf_joints:
-                    joint_state_msg.name.append(urdf_joint)
-                    joint_state_msg.position.append(position_rad)
-                    joint_state_msg.velocity.append(velocity_rad)
+            # Convert hardware feedback to URDF joint names
+            pos_dict_urdf = self.joint_mappings[hand].map_feedback(pos_dict)
+            vel_dict_urdf = self.joint_mappings[hand].map_feedback(vel_dict)
 
-            # Publish joint state message
+            # Construct and publish joint state message
+            joint_state_msg = JointState()
+            joint_state_msg.header.stamp = self.get_ros_time().to_msg()
+            joint_state_msg.name = self.joint_mappings[hand].joint_names
+            joint_state_msg.position = [pos_dict_urdf.get(joint, 0.0) for joint in joint_state_msg.name]
+            joint_state_msg.velocity = [vel_dict_urdf.get(joint, 0.0) for joint in joint_state_msg.name]
             self.joint_state_pub.publish(joint_state_msg)
 
             # Process tactile feedback
