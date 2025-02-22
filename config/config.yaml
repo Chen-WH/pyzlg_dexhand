@@ -17,7 +17,12 @@ DexHand:
     mode: 'cascaded_pid'  # Control mode: zero_torque, current, speed, hall_position, cascaded_pid, protect_hall_position
     alpha: 0.1  # Low-pass filter intensity (0-1)
 
-    # ROS2 configuration
-    topic: '/joint_commands'  # Topic to subscribe for joint commands
+    # Topic configuration
+    command_topic: '/joint_commands'  # Topic to subscribe for joint commands
+    joint_feedback_topic: '/joint_states'  # Topic to publish joint positions & velocities
+    touch_feedback_topic: '/touch_sensors'  # Topic to publish touch sensor readings
+
+    # Feedback configuration
+    enable_feedback: true   # Enable/disable feedback publishing
 
   ZCANDeviceType: "ZCAN_USBCANFD_100U"  # ZCAN_USBCANFD_100U/ZCAN_USBCANFD_200U

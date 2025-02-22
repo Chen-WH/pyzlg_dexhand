@@ -20,6 +20,8 @@ from pyzlg_dexhand.dexhand_interface import (
 )
 from pyzlg_dexhand.zcan_wrapper import MockZCANWrapper
 
+from filters import DampedVelocityKalmanFilter
+
 
 class HardwareMapping(Enum):
     """Mapping between URDF and hardware joints"""
@@ -88,7 +90,13 @@ class DexHandNode(ROSNode):
         send_rate = config.get("rate", 100.0)
         filter_alpha = config.get("alpha", 0.1)
         self.command_topic = config.get("topic", "/joint_commands")
+        self.joint_feedback_topic = config.get("joint_feedback_topic", "/joint_states")
+        self.touch_feedback_topic = config.get("touch_feedback_topic", "/touch_sensors")
         self.is_mock = config.get("mock", False)
+
+        # Add feedback configuration
+        self.enable_feedback = config.get("enable_feedback", False)
+        self.feedback_dt = 1.0 / send_rate  # Time step for Kalman filter
 
         # Initialize shared ZCAN
         self.zcan = ZCANWrapper() if not self.is_mock else MockZCANWrapper()
@@ -114,6 +122,17 @@ class DexHandNode(ROSNode):
         self.joint_mappings = {}
         self.last_commands = {}
 
+        # Initialize Kalman filters for each joint when feedback is enabled
+        self.kalman_filters = {}
+        self.last_joint_positions = {}
+        self.fingertip_mapping = {
+            'th': 0,  # Thumb
+            'ff': 1,  # Index
+            'mf': 2,  # Middle
+            'rf': 3,  # Ring
+            'lf': 4,  # Pinky
+        }
+
         for hand in hands:
             # Initialize hand with shared ZCAN
             hand_class = LeftDexHand if hand == "left" else RightDexHand
@@ -127,6 +146,21 @@ class DexHandNode(ROSNode):
             # Initialize last command
             self.last_commands[hand] = {}
 
+            # Initialize Kalman filters and state tracking for each joint
+            if self.enable_feedback:
+                self.kalman_filters[hand] = {}
+                self.last_joint_positions[hand] = {}
+
+                for joint_name in DexHandBase.joint_names:
+                    # Parameters for Kalman filter: dt, process_noise_var, measurement_noise_var, damping
+                    self.kalman_filters[hand][joint_name] = DampedVelocityKalmanFilter(
+                        dt=self.feedback_dt,
+                        process_noise_var=1.,
+                        measurement_noise_var=0.1,
+                        damping=0.9
+                    )
+                    self.last_joint_positions[hand][joint_name] = 0.0
+
         # Initialize command subscriber with configurable topic
         self.create_subscription(
             JointState, self.command_topic, self.command_callback
@@ -134,6 +168,12 @@ class DexHandNode(ROSNode):
 
         # Initialize reset service
         self.create_service(Trigger, "reset_hands", self.reset_callback)
+
+        # Initialize publishers for feedback
+        if self.enable_feedback:
+            self.joint_state_pub = self.create_publisher(JointState, self.joint_feedback_topic, 10)
+            self.touch_sensor_pub = self.create_publisher(Float32MultiArray, self.touch_feedback_topic, 10)
+
 
         # Set up command sending timer
         period = 1.0 / send_rate
@@ -144,7 +184,8 @@ class DexHandNode(ROSNode):
             f'  Hands: {", ".join(hands)}\n'
             f"  Control mode: {control_mode}\n"
             f"  Send rate: {send_rate} Hz\n"
-            f"  Filter alpha: {filter_alpha}"
+            f"  Filter alpha: {filter_alpha}\n"
+            f"  Feedback enabled: {self.enable_feedback}\n"
         )
 
     def command_callback(self, msg: JointState):
@@ -205,8 +246,73 @@ class DexHandNode(ROSNode):
                 # Clear errors
                 hand_interface.clear_errors(clear_all=True)
 
+                # Get and publish feedback if enabled
+                if self.enable_feedback:
+                    self.process_and_publish_feedback(hand)
+
         except Exception as e:
             self.logger.error(f"Error sending commands: {str(e)}")
+
+    def process_and_publish_feedback(self, hand: str):
+        """Get feedback from hardware and publish to ROS topics"""
+        try:
+            # Get feedback from hand
+            feedback = self.hands[hand].get_feedback()
+
+            # Create joint state message
+            joint_state_msg = JointState()
+            joint_state_msg.header.stamp = self.get_ros_time().to_msg()
+
+            # Process joint positions and estimate velocities
+            for joint_name, joint_feedback in feedback.joints.items():
+                # Get position
+                position = joint_feedback.angle
+
+                # Convert to radians for ROS
+                position_rad = np.deg2rad(position)
+
+                # Update the Kalman filter with new measurement
+                kalman_filter = self.kalman_filters[hand][joint_name]
+                kalman_filter.update(position)
+                state = kalman_filter.get_current_state()
+
+                # Extract position (state[0]) and velocity (state[1])
+                velocity = state[1][0]  # Extract velocity in deg/s
+                velocity_rad = np.deg2rad(velocity)  # Convert to rad/s for ROS
+
+                # Map to URDF joint names (one hardware joint may map to multiple URDF joints)
+                urdf_joints = []
+                for mapping in HardwareMapping:
+                    if mapping.value[0] == joint_name:
+                        hw_joint, urdf_joint_list = mapping.value
+                        for urdf_joint in urdf_joint_list:
+                            urdf_joints.append(f"{self.joint_mappings[hand].prefix}_{urdf_joint}")
+
+                # Add each URDF joint to the message
+                for urdf_joint in urdf_joints:
+                    joint_state_msg.name.append(urdf_joint)
+                    joint_state_msg.position.append(position_rad)
+                    joint_state_msg.velocity.append(velocity_rad)
+
+            # Publish joint state message
+            self.joint_state_pub.publish(joint_state_msg)
+
+            # Process tactile feedback
+            if feedback.tactile:
+                touch_msg = Float32MultiArray()
+                touch_msg.data = [0.0] * 5  # Default to 0 for all fingertips
+
+                # Map feedback to correct indices (thumb, index, middle, ring, pinky)
+                for finger_name, tactile_data in feedback.tactile.items():
+                    if finger_name in self.fingertip_mapping:
+                        idx = self.fingertip_mapping[finger_name]
+                        touch_msg.data[idx] = tactile_data.normal_force
+
+                # Publish tactile data
+                self.touch_sensor_pub.publish(touch_msg)
+
+        except Exception as e:
+            self.logger.error(f"Error processing feedback: {str(e)}")
 
     def reset_callback(self, request, response):
         """Reset all hands with bend-straighten sequence"""
