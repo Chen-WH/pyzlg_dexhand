@@ -268,6 +268,10 @@ class DexHandNode(ROSNode):
                 # Get position
                 position = joint_feedback.angle
 
+                # Skip update if position is NaN
+                if np.isnan(position):
+                    continue
+
                 # Convert to radians for ROS
                 position_rad = np.deg2rad(position)
 
