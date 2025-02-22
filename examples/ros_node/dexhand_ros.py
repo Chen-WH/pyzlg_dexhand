@@ -277,8 +277,8 @@ class DexHandNode(ROSNode):
                 position = joint_feedback.angle
 
                 # Update the Kalman filter with new measurement
+                kalman_filter = self.kalman_filters[hand][joint_name]
                 if not np.isnan(position):
-                    kalman_filter = self.kalman_filters[hand][joint_name]
                     kalman_filter.step(position)
                 state = kalman_filter.get_current_state()
 
