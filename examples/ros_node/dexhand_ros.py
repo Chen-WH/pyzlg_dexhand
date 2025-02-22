@@ -164,7 +164,7 @@ class DexHandNode(ROSNode):
                     # Parameters for Kalman filter: dt, process_noise_var, measurement_noise_var, damping
                     self.kalman_filters[hand][joint_name] = DampedVelocityKalmanFilter(
                         dt=self.feedback_dt,
-                        process_noise_var=1.0,
+                        process_noise_var=100.0,
                         measurement_noise_var=0.1,
                         damping=0.9,
                     )
