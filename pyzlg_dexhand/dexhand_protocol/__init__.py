@@ -9,6 +9,8 @@ from typing import Optional
 
 class MessageType(IntEnum):
     """CAN message type identifiers and their base addresses"""
+    COMMAND_WRITE = 0x02            # Host -> Hand: Write command
+    COMMAND_READ = 0x01             # Host -> Hand: Read request 
     MOTION_COMMAND = 0x100     # Host -> Hand: Motion control
     CONFIG_COMMAND = 0x00      # Host -> Hand: Configuration
     MOTION_FEEDBACK = 0x180    # Hand -> Host: Motion state
@@ -22,6 +24,15 @@ class BoardID(IntEnum):
     LEFT_HAND_BASE = 0x01
     RIGHT_HAND_BASE = 0x07
 
+class FlashStorageTable:
+    """Flash Storage Table for global location"""
+    MEMORY_ADDRESS_STALL_TIME_MOTOR1=0x50   # Motor 1 stall time
+    MEMORY_ADDRESS_STALL_TIME_MOTOR2=0x51   # Motor 2 stall time 
+    MEMORY_ADDRESS_SAFE_TEMPERATURE = 0x54  # Safe temperature
+    MEMORY_ADDRESS_MOTOR1_TORQUE = 0x5A     # Motor 1 torque
+    MEMORY_ADDRESS_MOTOR2_TORQUE = 0x5B     # Motor 2 torque
+    MEMORY_ADDRESS_BOTH_MOTORS_TORQUE = 0x5C  # Both motors torque
+
 def get_message_type(can_id: int) -> Optional[MessageType]:
     """Determine message type from CAN ID"""
     base = can_id & 0xF80  # Keep top 7 bits
@@ -31,4 +42,4 @@ def get_message_type(can_id: int) -> Optional[MessageType]:
         return None
 
 # Export common types
-__all__ = ['MessageType', 'get_message_type', 'commands', 'messages']
+__all__ = ['MessageType', 'BoardID', 'FlashStorageTable', 'get_message_type', 'commands', 'messages']

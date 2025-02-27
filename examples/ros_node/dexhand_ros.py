@@ -82,13 +82,17 @@ class DexHandNode(ROSNode):
     def __init__(self, config: dict):
         super().__init__("dexhand")
 
+
         # Get configuration values
         hands = config.get("hands", ["right"])
-        control_mode = config.get("mode", "cascaded_pid")
+        control_mode = config.get("mode", "impedance_grasp")
         send_rate = config.get("rate", 100.0)
         filter_alpha = config.get("alpha", 0.1)
         self.command_topic = config.get("topic", "/joint_commands")
         self.is_mock = config.get("mock", False)
+        self.safe_temperature = config.get("safe_temperature", 50)
+        self.motor_torque = config.get('motor_torque', 10)
+        self.stall_time = config.get('stall_time', 80)
 
         # Initialize shared ZCAN
         self.zcan = ZCANWrapper() if not self.is_mock else MockZCANWrapper()
@@ -103,9 +107,11 @@ class DexHandNode(ROSNode):
             "hall_position": ControlMode.HALL_POSITION,
             "cascaded_pid": ControlMode.CASCADED_PID,
             "protect_hall_position": ControlMode.PROTECT_HALL_POSITION,
+            "mit_torque":ControlMode.MIT_TORQUE,
+            "impedance_grasp":ControlMode.IMPEDANCE_GRASP
         }
         self.control_mode = self.control_mode_map.get(
-            control_mode, ControlMode.CASCADED_PID
+            control_mode, ControlMode.IMPEDANCE_GRASP
         )
         self.filter_alpha = filter_alpha
 
@@ -123,6 +129,9 @@ class DexHandNode(ROSNode):
 
             # Initialize joint mapping
             self.joint_mappings[hand] = JointMapping("l" if hand == "left" else "r")
+            self.hands[hand].set_safe_temperature(self.safe_temperature)
+            self.hands[hand].current_motor_control_torque("motor", self.motor_torque)
+            self.hands[hand].set_stall_time("motor", self.stall_time)
 
             # Initialize last command
             self.last_commands[hand] = {}
@@ -134,6 +143,8 @@ class DexHandNode(ROSNode):
 
         # Initialize reset service
         self.create_service(Trigger, "reset_hands", self.reset_callback)
+
+        self.create_service()
 
         # Set up command sending timer
         period = 1.0 / send_rate

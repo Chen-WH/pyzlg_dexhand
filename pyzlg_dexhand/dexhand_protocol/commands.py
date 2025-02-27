@@ -19,6 +19,8 @@ class ControlMode(IntEnum):
     HALL_POSITION = 0x33
     CASCADED_PID = 0x44
     PROTECT_HALL_POSITION = 0x55
+    MIT_TORQUE = 0x66
+    IMPEDANCE_GRASP = 0x77
 
 class FeedbackMode(IntEnum):
     """Feedback operation modes"""

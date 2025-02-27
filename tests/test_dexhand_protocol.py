@@ -32,7 +32,7 @@ class TestCommandEncoding:
         """Test motor command encoding matches protocol specification"""
         # Create a motor command with known values
         cmd = commands.MotorCommand(
-            control_mode=commands.ControlMode.CASCADED_PID,  # 0x44
+            control_mode=commands.ControlMode.IMPEDANCE_GRASP,  # 0x77
             motor_enable=0x03,  # Both motors enabled
             motor1_pos=1000,    # Test positive value
             motor2_pos=-2000    # Test negative value
@@ -43,7 +43,7 @@ class TestCommandEncoding:
         assert msg_type == MessageType.MOTION_COMMAND
 
         # Verify each byte according to protocol
-        assert data[0] == 0x44  # Control mode
+        assert data[0] == 0x77  # Control mode
         assert data[1] == 0x03  # Enable flags
         # Motor 1 position (little endian)
         assert data[2] == (1000 & 0xFF)
@@ -84,7 +84,7 @@ class TestCommandEncoding:
         # Test position range limits
         with pytest.raises(ValueError, match="position out of range"):
             cmd = commands.MotorCommand(
-                control_mode=commands.ControlMode.CASCADED_PID,
+                control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x03,
                 motor1_pos=32768,  # Just over limit
                 motor2_pos=0
@@ -93,7 +93,7 @@ class TestCommandEncoding:
 
         with pytest.raises(ValueError, match="position out of range"):
             cmd = commands.MotorCommand(
-                control_mode=commands.ControlMode.CASCADED_PID,
+                control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x03,
                 motor1_pos=0,
                 motor2_pos=-32769  # Just under limit
@@ -103,7 +103,7 @@ class TestCommandEncoding:
         # Test enable flags
         with pytest.raises(ValueError, match="enable flags"):
             cmd = commands.MotorCommand(
-                control_mode=commands.ControlMode.CASCADED_PID,
+                control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x04,  # Invalid flag
                 motor1_pos=0,
                 motor2_pos=0
@@ -276,7 +276,7 @@ class TestResponseVerification:
     def test_motor_command_response(self):
         """Test that motor commands don't expect responses"""
         cmd = commands.MotorCommand(
-            control_mode=commands.ControlMode.CASCADED_PID,
+            control_mode=commands.ControlMode.IMPEDANCE_GRASP,
             motor_enable=0x03,
             motor1_pos=0,
             motor2_pos=0

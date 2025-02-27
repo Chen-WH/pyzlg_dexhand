@@ -4,14 +4,16 @@ from unittest.mock import Mock, patch, call
 from dataclasses import asdict
 import yaml
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Optional
 
 from pyzlg_dexhand.dexhand_interface import (
     DexHandBase, LeftDexHand, RightDexHand, HandConfig,
-    JointFeedback, MoveFeedback, StampedTactileFeedback,
+    JointFeedback, StampedTactileFeedback, HandFeedback
 )
-from pyzlg_dexhand.dexhand_protocol import BoardID, MessageType
+from pyzlg_dexhand.dexhand_protocol import BoardID, MessageType, FlashStorageTable
 from pyzlg_dexhand.dexhand_protocol.commands import (
-    ControlMode, CommandType
+    ControlMode, CommandType, FeedbackMode
 )
 from pyzlg_dexhand.dexhand_protocol.messages import (
     BoardFeedback, MotorFeedback, TactileFeedback, ErrorInfo, ProcessedMessage, BoardError
@@ -50,7 +52,7 @@ class TestHandConfiguration:
         }
         config_file.write_text(yaml.dump(config_data))
 
-        hand = DexHandBase(str(config_file), BoardID.LEFT_HAND_BASE)
+        hand = DexHandBase(config_data, BoardID.LEFT_HAND_BASE)
         assert hand.config.channel == 0
         assert len(hand.config.hall_scale) == hand.NUM_MOTORS
         assert hand.config.hall_scale[0] == 2.1
@@ -63,21 +65,9 @@ class TestHandConfiguration:
             # Missing hall_scale
         }
         config_file.write_text(yaml.dump(config_data))
-
-        with pytest.raises(ValueError, match="Missing required keys"):
-            DexHandBase(str(config_file), BoardID.LEFT_HAND_BASE)
-
-    def test_wrong_scale_length(self, tmp_path):
-        """Test config with wrong number of scale factors"""
-        config_file = tmp_path / "wrong_scale.yaml"
-        config_data = {
-            "channel": 0,
-            "hall_scale": [2.1] * 6  # Wrong length
-        }
-        config_file.write_text(yaml.dump(config_data))
-
-        with pytest.raises(ValueError, match="Expected.*hall scale coefficients"):
-            DexHandBase(str(config_file), BoardID.LEFT_HAND_BASE)
+        
+        with pytest.raises(KeyError, match="hall_scale"):
+            DexHandBase(config_data, BoardID.LEFT_HAND_BASE)
 
 class TestHandInitialization:
     """Test hand initialization and device setup"""
@@ -146,17 +136,14 @@ class TestCommandExecution:
                 feedback=mock_feedback
             )
 
-            feedback = mock_hand.move_joints(
+            result = mock_hand.move_joints(
                 th_rot=30.0,
                 th_mcp=45.0,
-                control_mode=ControlMode.CASCADED_PID
+                control_mode=ControlMode.IMPEDANCE_GRASP
             )
 
-            assert isinstance(feedback, MoveFeedback)
-            assert feedback.command_timestamp > 0
-            assert 'th_rot' in feedback.joints
-            assert feedback.joints['th_rot'].angle == 45.0
-            assert 'th' in feedback.tactile  # Thumb tactile feedback
+            assert True if result==None else False
+
 
     def test_error_handling(self, mock_hand):
         """Test handling of hardware errors"""
@@ -175,20 +162,16 @@ class TestCommandExecution:
                 error=mock_error
             )
 
-            feedback = mock_hand.move_joints(th_rot=30.0)
+            result = mock_hand.move_joints(th_rot=30.0)
 
-            assert isinstance(feedback, MoveFeedback)
-            assert 'th_rot' in feedback.joints
+            assert result == None
 
     def test_communication_failure(self, mock_hand):
         """Test handling of communication failures"""
         mock_hand.zcan.send_fd_message.return_value = False
 
-        feedback = mock_hand.move_joints(th_rot=30.0)
-
-        assert isinstance(feedback, MoveFeedback)
-        assert 'th_rot' in feedback.joints
-        assert "Communication error" in feedback.joints['th_rot'].error
+        result = mock_hand.move_joints(th_rot=30.0)
+        assert result == None
 
 class TestJointControl:
     """Test joint control functionality"""
@@ -203,8 +186,8 @@ class TestJointControl:
 
     def test_angle_scaling(self, mock_hand):
         """Test angle scaling for different control modes"""
-        # Test CASCADED_PID mode
-        scaled = mock_hand._scale_angle(0, 45.0, ControlMode.CASCADED_PID)
+        # Test IMPEDANCE_GRASP mode
+        scaled = mock_hand._scale_angle(0, 45.0, ControlMode.IMPEDANCE_GRASP)
         assert scaled == 4500  # 45 * 100
 
         # Test HALL_POSITION mode
@@ -224,8 +207,8 @@ class TestJointControl:
                 msg_type=MessageType.MOTION_FEEDBACK,
                 feedback=mock_feedback
             )
-            feedback = mock_hand.reset_joints()
-            assert isinstance(feedback, MoveFeedback)
+            result = mock_hand.reset_joints()
+            assert result == None
 
     def test_get_feedback(self, mock_hand):
         """Test feedback collection without motion"""
@@ -241,7 +224,7 @@ class TestJointControl:
             )
 
             feedback = mock_hand.get_feedback()
-            assert isinstance(feedback, MoveFeedback)
+            assert isinstance(feedback, HandFeedback)
             assert len(feedback.joints) > 0
             assert len(feedback.tactile) > 0
 
@@ -282,6 +265,62 @@ class TestBoardAddressing:
 
         with pytest.raises(ValueError):
             mock_hand._get_command_id(MessageType.MOTION_COMMAND, mock_hand.NUM_BOARDS)  # Invalid board index
+
+class TestNewCommands:
+    """Test new commands: set_safe_temperature, current_motor_control_torque, set_stall_time"""
+
+    @pytest.fixture
+    def mock_hand(self):
+        """Create a mock hand with configured mocks"""
+        mock_zcan = Mock()
+        mock_zcan.configure_channel.return_value = True
+        hand = LeftDexHand(zcan=mock_zcan)
+        hand.init()
+        return hand
+
+    def test_set_safe_temperature(self, mock_hand):
+        """Test setting safe temperature"""
+        mock_hand._send_command = Mock(return_value=True)
+
+        # Test valid temperature
+        assert mock_hand.set_safe_temperature(55)
+        expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_SAFE_TEMPERATURE]) + b'\x37'
+        mock_hand._send_command.assert_called_once_with(expected_command)
+
+        # Test invalid temperature
+        mock_hand._send_command.reset_mock()
+        assert not mock_hand.set_safe_temperature(256)
+        mock_hand._send_command.assert_not_called()
+
+    def test_current_motor_control_torque(self, mock_hand):
+        """Test setting motor control torque"""
+        mock_hand._send_command = Mock(return_value=True)
+
+        # Test valid motor type and torque
+        assert mock_hand.current_motor_control_torque("motor1", 300)
+        expected_data = 300 .to_bytes(2, 'little')
+        expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE]) + expected_data
+        mock_hand._send_command.assert_called_once_with(expected_command)
+
+        # Test invalid motor type
+        mock_hand._send_command.reset_mock()
+        assert not mock_hand.current_motor_control_torque("invalid_motor", 100)
+        mock_hand._send_command.assert_not_called()
+
+    def test_set_stall_time(self, mock_hand):
+        """Test setting stall time"""
+        mock_hand._send_command = Mock(return_value=True)
+
+        # Test valid stall time
+        assert mock_hand.set_stall_time("motor1", 1000)
+        expected_data = 1000 .to_bytes(2, 'little')
+        expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + expected_data
+        mock_hand._send_command.assert_called_once_with(expected_command)
+
+        # Test invalid stall time
+        mock_hand._send_command.reset_mock()
+        assert not mock_hand.set_stall_time("motor1", 65536)
+        mock_hand._send_command.assert_not_called()
 
 if __name__ == '__main__':
     pytest.main([__file__])

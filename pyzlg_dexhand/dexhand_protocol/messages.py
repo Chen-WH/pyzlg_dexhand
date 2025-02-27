@@ -4,7 +4,7 @@ from enum import IntEnum
 from typing import Optional, Tuple
 import logging
 import numpy as np
-from . import MessageType, get_message_type
+from . import MessageType, get_message_type,FlashStorageTable
 from .commands import CommandType
 
 logger = logging.getLogger(__name__)

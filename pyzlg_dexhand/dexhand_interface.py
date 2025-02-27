@@ -23,6 +23,7 @@ from .dexhand_protocol.messages import (
     ErrorInfo,
     MessageType,
     ProcessedMessage,
+    FlashStorageTable,
 )
 
 
@@ -114,7 +115,7 @@ class DexHandBase:
         """Initialize dexterous hand interface
 
         Args:
-            config_path: Path to hand's YAML config file
+            config: Path to hand's YAML config file
             base_id: Base board ID (0x01 for left, 0x07 for right)
             zcan: Optional existing ZCANWrapper instance to share between hands
         """
@@ -210,13 +211,126 @@ class DexHandBase:
 
         return True
 
+    def set_safe_temperature(self, safe_temperature: int = None) -> bool:
+        """
+        Set the security temperature to prevent overheating (default value is 55℃)
+
+        Args:
+            safe_temperature (Uint8): Safety temperature value, ranging from 0 to 255
+
+        Returns:
+            bool: True if command sent successfully
+        """
+        if safe_temperature is None or not (0 <= safe_temperature <= 255):
+            logger.error(f"Invalid safe temperature: {safe_temperature}")
+            return False
+
+        # Construct write command
+        data = safe_temperature.to_bytes(1, byteorder='little')
+        command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_SAFE_TEMPERATURE]) + data
+
+        # Send command
+        success = self._send_command(command)
+        return success
+
+    def current_motor_control_torque(self, motor_type: str, current: int) -> bool:
+        """
+        Set the motor torque.
+
+        Args:
+            motor_type (str): Motor type, can only be "motor1", "motor2", or "motor"
+            current (int): Torque value, ranging from 0 to 599
+
+        Returns:
+            bool: Returns True if set successfully, otherwise returns False.
+        """
+        if motor_type not in ["motor1", "motor2", "motor"]:
+            logger.error(f"Invalid motor type: {motor_type}")
+            return False
+
+        if not (0 <= current <= 599):
+            logger.error(f"Invalid current value: {current}")
+            return False
+
+        # Select memory address according to motor type
+        if motor_type == "motor1":
+            address = FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE
+        elif motor_type == "motor2":
+            address = FlashStorageTable.MEMORY_ADDRESS_MOTOR2_TORQUE
+        else:
+            address = FlashStorageTable.MEMORY_ADDRESS_BOTH_MOTORS_TORQUE
+        # Construct write command
+        data = current.to_bytes(2, byteorder='little') 
+        command = bytes([MessageType.COMMAND_WRITE, address]) + data
+
+        # Send command
+        success = self._send_command(command)
+        return success
+
+    def set_stall_time(self, motor_type: str, stall_time: int = None) -> bool:
+        """
+        Set the stall time (optional).
+
+        Args:
+            stall_time (int): The stall time in milliseconds
+
+        Returns:
+            bool: Returns True if set successfully, False otherwise
+        """
+        if stall_time is None:
+            return False
+
+        if motor_type not in ["motor1", "motor2", "motor"]:
+            logger.error(f"Invalid motor type: {motor_type}")
+            return False
+
+        if not (0 <= stall_time <= 65535):
+            logger.error(f'stall time out of range')
+            return False
+
+        # Construct write command
+        data = stall_time.to_bytes(2, byteorder='little') 
+        if motor_type == "motor1":
+            command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
+            return self._send_command(command)
+        elif motor_type == "motor2":
+            command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR2]) + data
+            return self._send_command(command)
+        else:
+            command1 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
+            command2 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
+            # Send command
+            return self._send_command(command1) and self._send_command(command2)
+
+    def _send_command(self, command: bytes) -> bool:
+        """
+        Send a command to the control board.
+
+        Args:
+            command (bytes): The command data to be sent.
+
+        Returns:
+            bool: Returns True if set successfully, False otherwise
+        """
+        try:
+            # Send commands to all boards
+            for board_idx in range(self.NUM_BOARDS):
+                command_id = self._get_command_id(MessageType.CONFIG_COMMAND, board_idx)
+                if not self.zcan.send_fd_message(self.config.channel, command_id, command):
+                    logger.error(f"Failed to send command to board {board_idx}")
+                    return False
+            return True
+        except Exception as e:
+            logger.error(f"Error sending command: {e}")
+            return False
+
     def _send_motion_command(
         self,
         board_idx: int,
         motor1_pos: int,
         motor2_pos: int,
         motor_enable: int = 0x03,
-        control_mode: ControlMode = ControlMode.CASCADED_PID,
+        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
     ) -> bool:
         """Send a motion command to a specific board
 
@@ -303,7 +417,6 @@ class DexHandBase:
             return False
 
         return True
-
     def move_joints(
         self,
         th_rot: Optional[float] = None,  # thumb rotation
