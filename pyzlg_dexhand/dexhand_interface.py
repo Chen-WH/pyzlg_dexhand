@@ -255,12 +255,14 @@ class DexHandBase:
         # Select memory address according to motor type
         if motor_type == "motor1":
             address = FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE
+            data = current.to_bytes(2, byteorder='little')
         elif motor_type == "motor2":
             address = FlashStorageTable.MEMORY_ADDRESS_MOTOR2_TORQUE
+            data = current.to_bytes(2, byteorder='little')
         else:
             address = FlashStorageTable.MEMORY_ADDRESS_BOTH_MOTORS_TORQUE
+            data = current.to_bytes(4, byteorder='little') 
         # Construct write command
-        data = current.to_bytes(2, byteorder='little') 
         command = bytes([MessageType.COMMAND_WRITE, address]) + data
 
         # Send command
