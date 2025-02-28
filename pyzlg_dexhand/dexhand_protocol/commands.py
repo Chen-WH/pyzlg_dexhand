@@ -31,7 +31,7 @@ class FeedbackMode(IntEnum):
 @dataclass(frozen=True)
 class MotorCommand:
     """Command for a pair of motors"""
-    control_mode: ControlMode  # Control mode (e.g., CASCADED_PID)
+    control_mode: ControlMode  # Control mode (e.g., IMPEDANCE_GRASP)
     motor_enable: int         # Motor enable flags (0x01, 0x02, 0x03)
     motor1_pos: int          # Position command for motor 1 (-32768 to 32767)
     motor2_pos: int          # Position command for motor 2 (-32768 to 32767)

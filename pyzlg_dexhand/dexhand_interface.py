@@ -433,7 +433,7 @@ class DexHandBase:
         rf_dip: Optional[float] = None,  # ring finger coupled distal joints
         lf_mcp: Optional[float] = None,  # little finger metacarpophalangeal
         lf_dip: Optional[float] = None,  # little finger coupled distal joints
-        control_mode: ControlMode = ControlMode.CASCADED_PID,
+        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
     ):
         """Move hand joints to specified angles.
 
@@ -593,7 +593,7 @@ class DexHandBase:
         """Reset all joints to their zero positions.
 
         This is equivalent to setting all joint angles to 0 degrees.
-        Uses CASCADED_PID control mode.
+        Uses IMPEDANCE_GRASP control mode.
         """
         self.move_joints(
             th_rot=0,
@@ -608,7 +608,7 @@ class DexHandBase:
             rf_dip=0,
             lf_mcp=0,
             lf_dip=0,
-            control_mode=ControlMode.CASCADED_PID,
+            control_mode=ControlMode.IMPEDANCE_GRASP,
         )
 
     def close(self):

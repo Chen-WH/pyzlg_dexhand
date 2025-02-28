@@ -161,7 +161,7 @@ hand.move_joints(
     th_rot=30,  # 拇指旋转（0-150度）
     th_mcp=45,  # 拇指掌指关节弯曲（0-90度）
     th_dip=45,  # 拇指远端关节弯曲
-    control_mode=ControlMode.CASCADED_PID
+    control_mode=ControlMode.IMPEDANCE_GRASP
 )
 
 # 获取反馈
@@ -176,6 +176,8 @@ print(f"触觉力: {feedback.tactile['th'].normal_force}")
 
   - `CASCADED_PID`：提供更高刚度的精确位置控制
   - `PROTECT_HALL_POSITION`：提供更平滑的响应，但要求关节在上电时处于零位
+  - `MIT_TORQUE`：高精度的力矩控制，能够在触碰到物体后保持稳定的力度
+  - `IMPEDANCE_GRASP`：更好的柔性和适应性，适用于需要轻柔抓握和适应不同物体的应用
 
 - 错误处理
 

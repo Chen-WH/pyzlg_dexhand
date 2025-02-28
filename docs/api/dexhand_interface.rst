@@ -95,7 +95,7 @@ Basic Joint Control
         th_rot=30,     # Thumb rotation
         th_mcp=45,     # Thumb MCP flexion
         th_dip=45,     # Thumb coupled distal flexion
-        control_mode=ControlMode.CASCADED_PID
+        control_mode=ControlMode.IMPEDANCE_GRASP
     )
 
 Feedback Handling
@@ -134,7 +134,9 @@ Notes
 Control Modes
 ^^^^^^^^^^^
 
-* ``CASCADED_PID``: Default mode for precise position control. Provides highest stiffness and position accuracy.
+* ``IMPEDANCE_GRASP``: Default mode for impedance control mode. Touching objects using torque control.
+* ``MIT_TORQUE``: High-precision torque control mode. Using Torque to Control Motion.
+* ``CASCADED_PID``: precise position control mode. Provides highest stiffness and position accuracy.
 * ``HALL_POSITION``: Direct hall sensor position control. Less precise but faster response.
 * ``PROTECT_HALL_POSITION``: Safe hall position control requiring zero position at startup.
 * ``CURRENT``: Direct current control for force-based applications.

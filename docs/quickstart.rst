@@ -160,7 +160,7 @@ Example code:
         th_rot=30,  # Thumb rotation (0-150 degrees)
         th_mcp=45,  # Thumb MCP flexion (0-90 degrees)
         th_dip=45,  # Thumb coupled distal flexion
-        control_mode=ControlMode.CASCADED_PID
+        control_mode=ControlMode.IMPEDANCE_GRASP
     )
 
     # Get feedback
@@ -173,6 +173,9 @@ Control Modes
 
 * ``CASCADED_PID``: Provides precise position control with higher stiffness
 * ``PROTECT_HALL_POSITION``: Offers smoother response but requires joints to be in zero position at power-on
+* ``MIT_TORQUE``: High-precision torque control, capable of maintaining stable force after touching an object.
+* ``IMPEDANCE_GRASP``: Improved flexibility and adaptability, suitable for applications requiring gentle grasping and adaptation to different objects.
+
 
 Error Handling
 ^^^^^^^^^^^^

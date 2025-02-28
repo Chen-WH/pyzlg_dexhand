@@ -55,7 +55,7 @@ Basic Logging
     logger.log_command(
         command_type="move_joints",
         joint_commands={"th_rot": 30, "th_mcp": 45},
-        control_mode=ControlMode.CASCADED_PID,
+        control_mode=ControlMode.IMPEDANCE_GRASP,
         hand="right"
     )
 
@@ -130,7 +130,7 @@ Command Log (JSONL)::
             "th_rot": 30.0,
             "th_mcp": 45.0
         },
-        "control_mode": "CASCADED_PID"
+        "control_mode": "IMPEDANCE_GRASP"
     }
 
 Feedback Log (JSONL)::

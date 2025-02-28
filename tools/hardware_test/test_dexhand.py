@@ -207,7 +207,7 @@ class DexHandTester:
             self.logger.log_command(
                 "reset_joints",
                 {joint: 0.0 for joint in JOINT_CONFIGS},
-                ControlMode.CASCADED_PID,
+                ControlMode.IMPEDANCE_GRASP,
                 name,
                 feedback,
             )
@@ -248,7 +248,7 @@ class DexHandTester:
                     self.logger.log_command(
                         "move_joint",
                         {joint_name: max_angle},
-                        ControlMode.CASCADED_PID,
+                        ControlMode.IMPEDANCE_GRASP,
                         name,
                         feedback,
                     )
@@ -279,7 +279,7 @@ class DexHandTester:
                     self.logger.log_command(
                         "move_joint",
                         {joint_name: 0.0},
-                        ControlMode.CASCADED_PID,
+                        ControlMode.IMPEDANCE_GRASP,
                         name,
                         feedback,
                     )
@@ -325,7 +325,7 @@ class DexHandTester:
                 self.logger.log_command(
                     "simultaneous",
                     joint_commands,
-                    ControlMode.CASCADED_PID,
+                    ControlMode.IMPEDANCE_GRASP,
                     name,
                     feedback,
                 )
@@ -367,7 +367,7 @@ class DexHandTester:
                 self.logger.log_command(
                     "simultaneous",
                     zero_commands,
-                    ControlMode.CASCADED_PID,
+                    ControlMode.IMPEDANCE_GRASP,
                     name,
                     feedback,
                 )
@@ -443,7 +443,7 @@ class DexHandTester:
                 self.logger.log_command(
                     "consecutive",
                     joint_commands,
-                    ControlMode.CASCADED_PID,
+                    ControlMode.IMPEDANCE_GRASP,
                     name,
                     feedback,
                 )
@@ -511,7 +511,7 @@ class DexHandTester:
                 self.logger.log_command(
                     "consecutive",
                     joint_commands,
-                    ControlMode.CASCADED_PID,
+                    ControlMode.IMPEDANCE_GRASP,
                     name,
                     feedback,
                 )
