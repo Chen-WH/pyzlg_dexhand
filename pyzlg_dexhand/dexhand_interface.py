@@ -228,7 +228,7 @@ class DexHandBase:
         # Construct write command
         data = safe_temperature.to_bytes(1, byteorder='little')
         command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_SAFE_TEMPERATURE]) + data
-
+        
         # Send command
         success = self._send_command(command)
         return success
@@ -315,6 +315,8 @@ class DexHandBase:
             bool: Returns True if set successfully, False otherwise
         """
         try:
+            # Record the original instruction data sent
+            logger.debug(f"Sending command: {command.hex()}")
             # Send commands to all boards
             for board_idx in range(self.NUM_BOARDS):
                 command_id = self._get_command_id(MessageType.CONFIG_COMMAND, board_idx)
@@ -372,6 +374,10 @@ class DexHandBase:
         """Receive CANFD frames to update the states for all boards."""
         # Get all messages
         messages = self.zcan.receive_fd_messages(self.config.channel)
+
+        # Record the received original feedback data
+        for msg_id, data, timestamp in messages:
+            logger.debug(f"Received feedback: msg_id={msg_id}, data={data.hex()}, timestamp={timestamp}")
 
         # Process all received messages
         for msg_id, data, timestamp in messages:
