@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import List, Dict
 import time
-
+from . import LogLevel
 from .zcan_wrapper import ZCANWrapper
 from . import dexhand_protocol as protocol
 from .dexhand_protocol import BoardID
@@ -111,7 +111,12 @@ class DexHandBase:
         5: "lf",
     }  # Map from board index to finger name
 
-    def __init__(self, config: dict, base_id: int, zcan: Optional[ZCANWrapper] = None):
+    def __init__(
+            self,
+            config: dict, 
+            base_id: int, 
+            zcan: Optional[ZCANWrapper] = None, 
+            log_level: Optional[LogLevel] = LogLevel.INFO):
         """Initialize dexterous hand interface
 
         Args:
@@ -125,6 +130,7 @@ class DexHandBase:
         self.base_id = base_id
         self.zcan = zcan if zcan else ZCANWrapper()
         self._owns_zcan = zcan is None
+        self.log_level = log_level
 
         # Hall position scaling factors
         self._init_hall_scaling()
@@ -211,7 +217,10 @@ class DexHandBase:
 
         return True
 
-    def set_safe_temperature(self, safe_temperature: int = None) -> bool:
+    def set_safe_temperature(
+            self, 
+            safe_temperature: int = None,
+            log_level: Optional[LogLevel] = LogLevel.INFO) -> bool:
         """
         Set the security temperature to prevent overheating (default value is 55℃)
 
@@ -231,9 +240,16 @@ class DexHandBase:
         
         # Send command
         success = self._send_command(command)
+
+        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+            logger.debug("Command sent successfully for set safe temperature: {safe_temperature}")
         return success
 
-    def current_motor_control_torque(self, motor_type: str, current: int) -> bool:
+    def current_motor_control_torque(
+            self, 
+            motor_type: str, 
+            current: int,
+            log_level: Optional[LogLevel] = LogLevel.INFO) -> bool:
         """
         Set the motor torque.
 
@@ -267,9 +283,15 @@ class DexHandBase:
 
         # Send command
         success = self._send_command(command)
+        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+            logger.debug("Command sent successfully for {motor_type} control torque: {current}")
         return success
 
-    def set_stall_time(self, motor_type: str, stall_time: int = None) -> bool:
+    def set_stall_time(
+            self, 
+            motor_type: str,
+            stall_time: int = None,
+            log_level: Optional[LogLevel] = LogLevel.INFO) -> bool:
         """
         Set the stall time (optional).
 
@@ -294,17 +316,20 @@ class DexHandBase:
         data = stall_time.to_bytes(2, byteorder='little') 
         if motor_type == "motor1":
             command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
-            return self._send_command(command)
+            success = self._send_command(command)
         elif motor_type == "motor2":
             command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR2]) + data
-            return self._send_command(command)
+            success = self._send_command(command)
         else:
             command1 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
             command2 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
             # Send command
-            return self._send_command(command1) and self._send_command(command2)
+            success = self._send_command(command1) and self._send_command(command2)
+        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+            logger.debug("Command sent successfully for set {motor_type} stall time: {stall_time}")
+        return success
 
-    def _send_command(self, command: bytes) -> bool:
+    def _send_command(self, command: bytes,log_level: Optional[LogLevel] = LogLevel.INFO) -> bool:
         """
         Send a command to the control board.
 
@@ -315,8 +340,9 @@ class DexHandBase:
             bool: Returns True if set successfully, False otherwise
         """
         try:
+            if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
             # Record the original instruction data sent
-            logger.debug(f"Sending command: {command.hex()}")
+                logger.debug(f"Sending command: {command.hex()}")
             # Send commands to all boards
             for board_idx in range(self.NUM_BOARDS):
                 command_id = self._get_command_id(MessageType.CONFIG_COMMAND, board_idx)
@@ -370,14 +396,15 @@ class DexHandBase:
 
         return True
 
-    def _refresh_board_states(self):
+    def _refresh_board_states(self,log_level: Optional[LogLevel] = LogLevel.INFO):
         """Receive CANFD frames to update the states for all boards."""
         # Get all messages
         messages = self.zcan.receive_fd_messages(self.config.channel)
 
         # Record the received original feedback data
-        for msg_id, data, timestamp in messages:
-            logger.debug(f"Received feedback: msg_id={msg_id}, data={data.hex()}, timestamp={timestamp}")
+        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+            for msg_id, data, timestamp in messages:
+                logger.debug(f"Received feedback: msg_id={msg_id}, data={data.hex()}, timestamp={timestamp}")
 
         # Process all received messages
         for msg_id, data, timestamp in messages:
@@ -440,6 +467,7 @@ class DexHandBase:
         lf_mcp: Optional[float] = None,  # little finger metacarpophalangeal
         lf_dip: Optional[float] = None,  # little finger coupled distal joints
         control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
+        log_level: Optional[LogLevel] = LogLevel.INFO
     ):
         """Move hand joints to specified angles.
 
@@ -508,6 +536,9 @@ class DexHandBase:
                 )
                 if not success:
                     logger.error(f"Failed to send command to board {board_idx}")
+        if self.log_level <= LogLevel.INFO or log_level <= LogLevel.INFO:
+            logger.info(f"successfully for move joints command")
+
 
     def get_feedback(self) -> HandFeedback:
         """Get feedback from all joints and tactile sensors
@@ -595,11 +626,16 @@ class DexHandBase:
             # For cascaded PID mode, scale to 100x for hardware units
             return int(angle * 100)
 
-    def reset_joints(self):
+    def reset_joints(self,log_level: Optional[LogLevel] = LogLevel.INFO):
         """Reset all joints to their zero positions.
 
         This is equivalent to setting all joint angles to 0 degrees.
         Uses IMPEDANCE_GRASP control mode.
+
+        Args:
+            log_level: default for LogLevel.INFO:0,All control commands, parameter read and write commands, all feedback information, error messages;
+                        LogLevel.DEBUG:1,All parameter setting commands, parameter setting feedback information, all error messages;
+                        LogLevel.ERROR:2,All error messages;
         """
         self.move_joints(
             th_rot=0,
@@ -615,7 +651,10 @@ class DexHandBase:
             lf_mcp=0,
             lf_dip=0,
             control_mode=ControlMode.IMPEDANCE_GRASP,
+            log_level=log_level
         )
+        if self.log_level <= LogLevel.INFO or log_level <= LogLevel.INFO:
+            logger.info(f"successfully for reset joints command")
 
     def close(self):
         """Close CAN communication"""
@@ -626,7 +665,7 @@ class DexHandBase:
 class LeftDexHand(DexHandBase):
     """Control interface for left dexterous hand"""
 
-    def __init__(self, zcan: Optional[ZCANWrapper] = None):
+    def __init__(self, zcan: Optional[ZCANWrapper] = None, log_level: Optional[LogLevel] = LogLevel.INFO):
         config_path = os.path.join(
             os.path.dirname(__file__), "../config", "config.yaml"
         )
@@ -636,13 +675,14 @@ class LeftDexHand(DexHandBase):
             config["DexHand"]["left_hand"],
             BoardID.LEFT_HAND_BASE,
             zcan,
+            log_level=log_level
         )
 
 
 class RightDexHand(DexHandBase):
     """Control interface for right dexterous hand"""
 
-    def __init__(self, zcan: Optional[ZCANWrapper] = None):
+    def __init__(self, zcan: Optional[ZCANWrapper] = None, log_level: Optional[LogLevel] = LogLevel.INFO):
         config_path = os.path.join(
             os.path.dirname(__file__), "../config", "config.yaml"
         )
@@ -652,4 +692,5 @@ class RightDexHand(DexHandBase):
             config["DexHand"]["right_hand"],
             BoardID.RIGHT_HAND_BASE,
             zcan,
+            log_level=log_level
         )

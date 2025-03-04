@@ -10,6 +10,7 @@ from pathlib import Path
 import queue
 import threading
 from contextlib import contextmanager
+from . import LogLevel
 
 from .dexhand_interface import (
     ControlMode,
@@ -111,11 +112,14 @@ class LogWriter(threading.Thread):
 class DexHandLogger:
     """Logger for dexterous hand commands and feedback with background writing"""
 
-    def __init__(self, log_dir: str = "dexhand_logs"):
+    def __init__(self, log_dir: str = "dexhand_logs", log_level: Optional[LogLevel] = LogLevel.INFO):
         """Initialize hand logger
 
         Args:
             log_dir: Directory to store log files
+            log_level: default for LogLevel.INFO:0,All control commands, parameter read and write commands, all feedback information, error messages;
+                        LogLevel.DEBUG:1,All parameter setting commands, parameter setting feedback information, all error messages;
+                        LogLevel.ERROR:2,All error messages;
         """
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -135,8 +139,10 @@ class DexHandLogger:
         self.buffer_lock = threading.Lock()
 
         self.start_time = time.time()
-        logger.info(f"Logging session started in {self.session_dir}")
-
+        self.log_level = log_level
+        if self.log_level <= LogLevel.INFO:
+            logger.info(f"Logging session started in {self.session_dir}")
+        
     def log_command(
         self,
         command_type: str,
@@ -333,8 +339,15 @@ class DexHandLogger:
         if show:
             plt.show()
 
-    def close(self):
-        """Close the logger and save any remaining data"""
+    def close(self, log_level: Optional[LogLevel] = LogLevel.INFO):
+        """
+        Close the logger and save any remaining data
+
+        Args:
+            log_level: default for LogLevel.INFO:0,All control commands, parameter read and write commands, all feedback information, error messages;
+                        LogLevel.DEBUG:1,All parameter setting commands, parameter setting feedback information, all error messages;
+                        LogLevel.ERROR:2,All error messages;
+        """
         # Save summary statistics
         with self.buffer_lock:
             stats = {
@@ -355,8 +368,8 @@ class DexHandLogger:
 
         # Stop the writer thread and close files
         self.writer.stop()
-
-        logger.info(f"Logging session completed: {stats}")
+        if self.log_level <= LogLevel.INFO or log_level <= LogLevel.INFO:
+            logger.info(f"Logging session completed: {stats}")
 
         # Generate plots
         self.plot_session(show=False, save=True)

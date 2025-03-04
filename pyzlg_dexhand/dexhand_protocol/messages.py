@@ -71,6 +71,13 @@ class ProcessedMessage:
     feedback: Optional[BoardFeedback] = None
     error: Optional[ErrorInfo] = None
 
+@dataclass
+class WriteMessage:
+    """Message to be written to the board"""
+    sender_id: int
+    msg_type: MessageType
+    feedback: bool
+
 def process_message(can_id: int, data: bytes) -> ProcessedMessage:
     """Process a received CAN message
 
@@ -204,6 +211,34 @@ def _decode_error(data: bytes) -> ErrorInfo:
         error_code=error_code,
         description=description,
     )
+
+def decode_write(can_id: int, data: bytes) -> WriteMessage:
+    """Decode a write command response
+
+    Args:
+        can_id: CAN ID of the response
+        data: Raw response bytes
+
+    Returns:
+        Tuple of boolean indicating success and command type (if applicable)
+    """
+    sender_id = can_id - 0x80
+    if data[0] != MessageType.COMMAND_WRITE:
+        raise ValueError("Invalid write command response: {data[0]}")
+    elif data[0] == MessageType.COMMAND_WRITE and data[4] == 0x01:
+        return WriteMessage(
+            sender_id=sender_id,
+            msg_type=MessageType.COMMAND_WRITE,
+            feedback=True  # Success response for write commands
+        )
+    elif data[0] == MessageType.COMMAND_WRITE and data[4] == 0x00:
+        return WriteMessage(
+            sender_id=sender_id,
+            msg_type=MessageType.COMMAND_WRITE,
+            feedback=False  # Failure response for write commands
+        )
+    else:
+        raise ValueError(f"Invalid write type/code: {data[1]}")
 
 def verify_config_response(msg_id: int, data: bytes) -> Tuple[bool, Optional[CommandType]]:
     """Verify a command response

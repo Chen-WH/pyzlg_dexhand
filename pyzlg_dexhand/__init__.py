@@ -10,6 +10,12 @@ from .dexhand_interface import (
 )
 from .zcan_wrapper import ZCANWrapper, MockZCANWrapper
 from .dexhand_logger import DexHandLogger
+from enum import IntEnum
+
+class LogLevel(IntEnum):
+    INFO = 0
+    DEBUG = 1
+    ERROR = 2
 
 __all__ = [
     'LeftDexHand',
