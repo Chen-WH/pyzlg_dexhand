@@ -9,6 +9,11 @@ from .commands import CommandType
 
 logger = logging.getLogger(__name__)
 
+class LogLevel(IntEnum):
+    INFO = 0
+    DEBUG = 1
+    ERROR = 2
+
 class BoardError(IntEnum):
     """Motor error status"""
     MOTOR1_ERROR = 0x01

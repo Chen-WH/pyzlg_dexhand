@@ -7,7 +7,6 @@ import logging
 from pathlib import Path
 from typing import List, Dict
 import time
-from . import LogLevel
 from .zcan_wrapper import ZCANWrapper
 from . import dexhand_protocol as protocol
 from .dexhand_protocol import BoardID
@@ -24,6 +23,7 @@ from .dexhand_protocol.messages import (
     MessageType,
     ProcessedMessage,
     FlashStorageTable,
+    LogLevel,
 )
 
 
@@ -322,7 +322,7 @@ class DexHandBase:
             success = self._send_command(command)
         else:
             command1 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
-            command2 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
+            command2 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR2]) + data
             # Send command
             success = self._send_command(command1) and self._send_command(command2)
         if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:

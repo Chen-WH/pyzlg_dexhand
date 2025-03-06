@@ -10,13 +10,13 @@ from pathlib import Path
 import queue
 import threading
 from contextlib import contextmanager
-from . import LogLevel
 
 from .dexhand_interface import (
     ControlMode,
     HandFeedback,
     StampedTactileFeedback,
     JointFeedback,
+    LogLevel,
 )
 
 logger = logging.getLogger(__name__)
