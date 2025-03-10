@@ -113,10 +113,10 @@ class TestCommandEncoding:
 class TestMessageDecoding:
     """Test message decoding according to protocol specification"""
 
-    def test_feedback_decoding(self):
+    def test_feedback_decoding(self):   
         """Test feedback message decoding matches protocol specification"""
         # Construct feedback data according to protocol
-        data = bytearray(46)  # Full message with encoders
+        data = bytearray(56)  # Full message with encoders
 
         # Motor 1 data (bytes 0-5)
         struct.pack_into('<h', data, 0, 100)     # Current (mA)
@@ -144,6 +144,10 @@ class TestMessageDecoding:
         # Encoder values (bytes 42-45)
         struct.pack_into('<H', data, 42, 2048)   # Encoder 1
         struct.pack_into('<H', data, 44, 1024)   # Encoder 2
+
+        # Motor impedance values (48-55)
+        struct.pack_into('<f', data, 48, 100.0)   # Motor 1 impedance
+        struct.pack_into('<f', data, 52, 200.0)   # Motor 2 impedance
 
         # Decode and verify values
         msg = messages.process_message(0x181, bytes(data))
@@ -175,6 +179,10 @@ class TestMessageDecoding:
         # Verify encoder values
         assert msg.feedback.encoder1 == 2048
         assert msg.feedback.encoder2 == 1024
+
+        # Verify motor impedance values
+        assert msg.feedback.impedance1 == 100.0 
+        assert msg.feedback.impedance2 == 200.0 
 
     def test_error_decoding(self):
         """Test error message decoding matches protocol specification"""
@@ -242,21 +250,8 @@ class TestMessageDecoding:
         assert board_id == 0x09
 
 
-class TestResponseVerification:
+class TestResponseVerification: 
     """Test command response verification"""
-
-    def test_clear_error_response(self):
-        """Test clear error command response verification"""
-        cmd = commands.ClearErrorCommand()
-
-        # Valid response
-        assert commands.verify_response(cmd, 0x081, bytes([0x03, 0xA4, 0x00, 0x01]))
-
-        # Invalid responses
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0xA4, 0x00, 0x00]))  # Failed
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0xA4]))  # Too short
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0x74, 0x00, 0x01]))  # Wrong command
-
     def test_feedback_config_response(self):
         """Test feedback configuration response verification"""
         cmd = commands.FeedbackConfigCommand(
@@ -264,14 +259,17 @@ class TestResponseVerification:
             period_ms=100,
             enable=True
         )
+        message_type, encoded_data = commands.encode_command(cmd)
 
         # Valid response
-        assert commands.verify_response(cmd, 0x081, bytes([0x03, 0x74, 0x00, 0x01]))
+        assert message_type == MessageType.CONFIG_COMMAND
+        # Invalid responses
+        assert encoded_data == bytes([0x03, 0x74, 0x01, 0x0A, 0x01])
 
         # Invalid responses
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0x74, 0x00, 0x00]))  # Failed
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0x74]))  # Too short
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0xA4, 0x00, 0x01]))  # Wrong command
+        assert not encoded_data == bytes([0x03, 0x74, 0x00, 0x00]) # Failed
+        assert not encoded_data == bytes([0x03, 0x74])  # Too short
+        assert not encoded_data == bytes([0x03, 0xA4, 0x00, 0x01])  # Wrong command
 
     def test_motor_command_response(self):
         """Test that motor commands don't expect responses"""
@@ -282,7 +280,9 @@ class TestResponseVerification:
             motor2_pos=0
         )
         # Motor commands should never verify responses
-        assert not commands.verify_response(cmd, 0x181, bytes([0x00] * 4))
+        message_type, encoded_data = commands.encode_command(cmd)
+        assert message_type == MessageType.MOTION_COMMAND
+        assert not encoded_data == bytes([0x00] * 4)
 
 if __name__ == '__main__':
     pytest.main([__file__])

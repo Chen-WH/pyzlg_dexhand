@@ -60,6 +60,8 @@ class BoardFeedback:
     tactile: Optional[TactileFeedback] = None
     encoder1: int = 0  # Raw encoder 1 value (0-4095)
     encoder2: int = 0  # Raw encoder 2 value (0-4095)
+    impedance1: float = 0   # Motor 1 impedance reading
+    impedance2: float = 0   # Motor 2 impedance reading
 
 @dataclass(frozen=True)
 class ErrorInfo:
@@ -178,6 +180,12 @@ def _decode_feedback(data: bytes) -> BoardFeedback:
             encoder1 = int.from_bytes(data[42:44], 'little')
             encoder2 = int.from_bytes(data[44:46], 'little')
 
+         # Decode encoders if present
+        if len(data) >= 56:
+            impedance1 = struct.unpack('<f', data[48:52])[0]  # convert to float
+            impedance2 = struct.unpack('<f', data[52:56])[0]  # convert to float
+
+
         # Create BoardFeedback instance once with all data
         return BoardFeedback(
             motor1=motor1,
@@ -186,7 +194,9 @@ def _decode_feedback(data: bytes) -> BoardFeedback:
             position_sensor2=pos2,
             tactile=tactile,
             encoder1=encoder1,
-            encoder2=encoder2
+            encoder2=encoder2,
+            impedance1=impedance1,
+            impedance2=impedance2,
         )
 
     except (struct.error, TypeError) as e:
