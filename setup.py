@@ -11,6 +11,7 @@ setup(
         "ipython",
         "matplotlib",
         "pandas",
+        "filterpy",
         "ros_compat @ git+https://gitee.com/dexrobot/ros_compat.git",
     ],
     extras_require={
