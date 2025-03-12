@@ -11,10 +11,7 @@ DexHand:
     hands: ['left']  # List of hands to control: 'left', 'right', or both
     cycle_time: 3.0   # Time for each movement cycle (seconds)
     mock: False       # Use mock hardware instead of real hardware
-    safe_temperature: 55 # Safe temperature, in ℃
-    motor_torque: 10  # motor control torque, in mA
-    stall_time: 80  # Motor 1 stall time, in ms
-
+    
     # Control parameters
     rate: 100.0  # Command sending rate in Hz
     mode: 'impedance_grasp'  # Control mode: zero_torque, current, speed, hall_position, cascaded_pid, protect_hall_position

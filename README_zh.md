@@ -131,7 +131,7 @@ python examples/ros_node/dexhand_ros_publisher_demo.py --hands right --cycle-tim
 | ------------------- | ------------------------ | ---- | -------------------------- |
 | `/joint_commands`   | `sensor_msgs/JointState` | 输入 | 关节位置命令               |
 | `/joint_states`     | `sensor_msgs/JointState` | 输出 | 关节位置反馈（即将推出）   |
-| `/tactile_feedback` | TBD                      | 输出 | 触觉传感器数据（即将推出） |
+| `/touch_sensors` | TBD                      | 输出 | 触觉传感器数据（即将推出） |
 
 话题名称可通过 `config/config.yaml` 配置。
 

@@ -131,7 +131,7 @@ Interface:
 | ------------------- | ------------------------ | --------- | ------------------------------------- |
 | `/joint_commands`   | `sensor_msgs/JointState` | Input     | Joint position commands               |
 | `/joint_states`     | `sensor_msgs/JointState` | Output    | Joint position feedback (Coming soon) |
-| `/tactile_feedback` | TBD                      | Output    | Tactile sensor data (Coming soon)     |
+| `/touch_sensors` | TBD                      | Output    | Tactile sensor data (Coming soon)     |
 
 Topic names configurable via `config/config.yaml`.
 

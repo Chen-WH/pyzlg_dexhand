@@ -90,9 +90,6 @@ class DexHandNode(ROSNode):
         filter_alpha = config.get("alpha", 0.1)
         self.command_topic = config.get("topic", "/joint_commands")
         self.is_mock = config.get("mock", False)
-        self.safe_temperature = config.get("safe_temperature", 50)
-        self.motor_torque = config.get('motor_torque', 10)
-        self.stall_time = config.get('stall_time', 80)
 
         # Initialize shared ZCAN
         self.zcan = ZCANWrapper() if not self.is_mock else MockZCANWrapper()
@@ -129,9 +126,6 @@ class DexHandNode(ROSNode):
 
             # Initialize joint mapping
             self.joint_mappings[hand] = JointMapping("l" if hand == "left" else "r")
-            self.hands[hand].set_safe_temperature(self.safe_temperature)
-            self.hands[hand].current_motor_control_torque("motor", self.motor_torque)
-            self.hands[hand].set_stall_time("motor", self.stall_time)
 
             # Initialize last command
             self.last_commands[hand] = {}
