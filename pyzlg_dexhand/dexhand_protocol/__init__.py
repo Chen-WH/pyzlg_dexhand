@@ -29,6 +29,7 @@ class FlashStorageTable:
     MEMORY_ADDRESS_STALL_TIME_MOTOR1=0x50   # Motor 1 stall time
     MEMORY_ADDRESS_STALL_TIME_MOTOR2=0x51   # Motor 2 stall time 
     MEMORY_ADDRESS_SAFE_TEMPERATURE = 0x54  # Safe temperature
+    MEMORY_ADDRESS_PRESSURE_LIMIT_VALUE = 0x58 # Pressure limit value
     MEMORY_ADDRESS_MOTOR1_TORQUE = 0x5A     # Motor 1 torque
     MEMORY_ADDRESS_MOTOR2_TORQUE = 0x5B     # Motor 2 torque
     MEMORY_ADDRESS_BOTH_MOTORS_TORQUE = 0x5C  # Both motors torque

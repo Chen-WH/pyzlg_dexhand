@@ -230,10 +230,19 @@ class DexHandBase:
         Returns:
             bool: True if command sent successfully
         """
-        if safe_temperature is None or not (0 <= safe_temperature <= 255):
-            logger.error(f"Invalid safe temperature: {safe_temperature}")
-            return False
-
+        try:
+            if safe_temperature is None or not (0 <= safe_temperature <= 255):
+                logger.error(f"Invalid safe temperature: {safe_temperature}")
+                return False
+            
+            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR}:
+                logger.error(f"Invalid log level: {log_level}")
+                return False
+            
+        except ValueError as e:
+            logger.error(f"Invalid safe temperature: {e}")
+            return
+        
         # Construct write command
         data = safe_temperature.to_bytes(1, byteorder='little')
         command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_SAFE_TEMPERATURE]) + data
@@ -260,24 +269,33 @@ class DexHandBase:
         Returns:
             bool: Returns True if set successfully, otherwise returns False.
         """
-        if motor_type not in ["motor1", "motor2", "motor"]:
-            logger.error(f"Invalid motor type: {motor_type}")
-            return False
+        try:
+            if motor_type not in ["motor1", "motor2", "motor"]:
+                logger.error(f"Invalid motor type: {motor_type}")
+                return False
 
-        if not (0 <= current <= 599):
-            logger.error(f"Invalid current value: {current}")
-            return False
+            if not (0 <= current <= 599):
+                logger.error(f"Invalid current value: {current}")
+                return False
+            
+            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR}:
+                logger.error(f"Invalid log level: {log_level}")
+                return False
 
-        # Select memory address according to motor type
-        if motor_type == "motor1":
-            address = FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE
-            data = current.to_bytes(2, byteorder='little')
-        elif motor_type == "motor2":
-            address = FlashStorageTable.MEMORY_ADDRESS_MOTOR2_TORQUE
-            data = current.to_bytes(2, byteorder='little')
-        else:
-            address = FlashStorageTable.MEMORY_ADDRESS_BOTH_MOTORS_TORQUE
-            data = current.to_bytes(4, byteorder='little') 
+            # Select memory address according to motor type
+            if motor_type == "motor1":
+                address = FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE
+                data = current.to_bytes(2, byteorder='little')
+            elif motor_type == "motor2":
+                address = FlashStorageTable.MEMORY_ADDRESS_MOTOR2_TORQUE
+                data = current.to_bytes(2, byteorder='little')
+            elif motor_type == "motor":
+                address = FlashStorageTable.MEMORY_ADDRESS_BOTH_MOTORS_TORQUE
+                data = current.to_bytes(4, byteorder='little') 
+
+        except ValueError as e:
+            logger.error(f"Invalid motor type or current value: {e}")
+            return
         # Construct write command
         command = bytes([MessageType.COMMAND_WRITE, address]) + data
 
@@ -290,7 +308,7 @@ class DexHandBase:
     def set_stall_time(
             self, 
             motor_type: str,
-            stall_time: int = None,
+            stall_time: int,
             log_level: Optional[LogLevel] = LogLevel.INFO) -> bool:
         """
         Set the stall time (optional).
@@ -301,16 +319,22 @@ class DexHandBase:
         Returns:
             bool: Returns True if set successfully, False otherwise
         """
-        if stall_time is None:
-            return False
 
-        if motor_type not in ["motor1", "motor2", "motor"]:
-            logger.error(f"Invalid motor type: {motor_type}")
-            return False
+        try:
+            if motor_type not in ["motor1", "motor2", "motor"]:
+                logger.error(f"Invalid motor type: {motor_type}")
+                return False
 
-        if not (0 <= stall_time <= 65535):
-            logger.error(f'stall time out of range')
-            return False
+            if not (0 <= stall_time <= 65535):
+                logger.error(f'stall time out of range')
+                return False
+            
+            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR}:
+                logger.error(f"Invalid log level: {log_level}")
+                return False
+        except ValueError as e:
+            logger.error(f"Invalid stall time: {e}")
+            return
 
         # Construct write command
         data = stall_time.to_bytes(2, byteorder='little') 
@@ -327,6 +351,42 @@ class DexHandBase:
             success = self._send_command(command1) and self._send_command(command2)
         if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
             logger.debug("Command sent successfully for set {motor_type} stall time: {stall_time}")
+        return success
+    
+    def set_pressure_limit_value(
+            self, 
+            value: int , 
+            log_level: Optional[LogLevel] = LogLevel.INFO) -> bool:
+        """
+        Set the pressure limit value.
+
+        Args:
+            value (int): Pressure limit value, ranging from 0 to 20 N
+            log_level (LogLevel): Logging level
+
+        Returns:
+            bool: Returns True if set successfully, False otherwise
+        """
+        try:
+            if not (0 <= value <= 20):
+                logger.error(f"Invalid pressure limit value: {value}")
+                return False
+            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR}:
+                logger.error(f"Invalid log level: {log_level}")
+                return False
+        except ValueError as e:
+            logger.error(f"Invalid pressure limit value: {e}")
+            return
+
+        # Construct write command
+        value = value * 100
+        data = value.to_bytes(2, byteorder='little')
+        command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_VALUE]) + data
+
+        # Send command
+        success = self._send_command(command)
+        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+            logger.debug("Command sent successfully for set pressure limit value: {value}")
         return success
 
     def _send_command(self, command: bytes,log_level: Optional[LogLevel] = LogLevel.INFO) -> bool:

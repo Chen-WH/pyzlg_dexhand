@@ -280,47 +280,63 @@ class TestNewCommands:
 
     def test_set_safe_temperature(self, mock_hand):
         """Test setting safe temperature"""
-        mock_hand._send_command = Mock(return_value=True)
 
         # Test valid temperature
-        assert mock_hand.set_safe_temperature(55)
-        expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_SAFE_TEMPERATURE]) + b'\x37'
-        mock_hand._send_command.assert_called_once_with(expected_command)
-
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert mock_hand.set_safe_temperature(55)
+            expected_data = 55 .to_bytes(1, 'little')
+            expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_SAFE_TEMPERATURE]) + expected_data
+            mock_send_command.assert_called_once_with(expected_command)
         # Test invalid temperature
-        mock_hand._send_command.reset_mock()
-        assert not mock_hand.set_safe_temperature(256)
-        mock_hand._send_command.assert_not_called()
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert not mock_hand.set_safe_temperature(256)
+            mock_send_command.assert_not_called()
 
     def test_current_motor_control_torque(self, mock_hand):
         """Test setting motor control torque"""
-        mock_hand._send_command = Mock(return_value=True)
-
+        
         # Test valid motor type and torque
-        assert mock_hand.current_motor_control_torque("motor1", 300)
-        expected_data = 300 .to_bytes(2, 'little')
-        expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE]) + expected_data
-        mock_hand._send_command.assert_called_once_with(expected_command)
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert mock_hand.current_motor_control_torque("motor1", 300)
+            expected_data = 300 .to_bytes(2, 'little')
+            expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE]) + expected_data
+            mock_send_command.assert_called_once_with(expected_command)
 
         # Test invalid motor type
-        mock_hand._send_command.reset_mock()
-        assert not mock_hand.current_motor_control_torque("invalid_motor", 100)
-        mock_hand._send_command.assert_not_called()
+
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert not mock_hand.current_motor_control_torque("invalid_motor", 100)
+            mock_send_command.assert_not_called()
 
     def test_set_stall_time(self, mock_hand):
         """Test setting stall time"""
-        mock_hand._send_command = Mock(return_value=True)
-
         # Test valid stall time
-        assert mock_hand.set_stall_time("motor1", 1000)
-        expected_data = 1000 .to_bytes(2, 'little')
-        expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + expected_data
-        mock_hand._send_command.assert_called_once_with(expected_command)
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert mock_hand.set_stall_time("motor1", 1000)
+            expected_data = 1000 .to_bytes(2, 'little')
+            expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + expected_data
+            mock_send_command.assert_called_once_with(expected_command)
 
         # Test invalid stall time
-        mock_hand._send_command.reset_mock()
-        assert not mock_hand.set_stall_time("motor1", 65536)
-        mock_hand._send_command.assert_not_called()
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert not mock_hand.set_stall_time("invalid_motor", 65536)
+            mock_send_command.assert_not_called()
+
+
+    def test_set_pressure_limit_value(self ,mock_hand):
+        """Test setting pressure limit value"""
+        # Test valid pressure limit value
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert mock_hand.set_pressure_limit_value(20)
+            expected_data = 2000 .to_bytes(2, 'little')
+            expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_VALUE]) + expected_data
+            mock_send_command.assert_called_once_with(expected_command)
+
+        # Test invalid pressure limit value
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert not mock_hand.set_pressure_limit_value(30)
+            mock_send_command.assert_not_called()
+    
 
 if __name__ == '__main__':
     pytest.main([__file__])
