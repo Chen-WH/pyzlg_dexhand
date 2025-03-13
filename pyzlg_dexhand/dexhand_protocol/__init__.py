@@ -33,6 +33,7 @@ class FlashStorageTable:
     MEMORY_ADDRESS_MOTOR1_TORQUE = 0x5A     # Motor 1 torque
     MEMORY_ADDRESS_MOTOR2_TORQUE = 0x5B     # Motor 2 torque
     MEMORY_ADDRESS_BOTH_MOTORS_TORQUE = 0x5C  # Both motors torque
+    MEMORY_ADDRESS_PRESSURE_LIMIT_ENABLE = 0xa6 # Pressure limit enable 
 
 def get_message_type(can_id: int) -> Optional[MessageType]:
     """Determine message type from CAN ID"""

@@ -388,6 +388,41 @@ class DexHandBase:
         if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
             logger.debug("Command sent successfully for set pressure limit value: {value}")
         return success
+    
+    def set_pressure_limit_enable(
+        self, 
+        enable: bool, 
+        log_level: Optional[LogLevel] = LogLevel.INFO
+    ) -> bool:
+        """
+        Enable/disable the pressure limit function.
+
+        Args:
+            enable (bool): True to enable pressure limit, False to disable
+            log_level (LogLevel): Logging level for operation feedback
+
+        Returns:
+            bool: True if command executed successfully, False otherwise
+        """
+        try:
+            if not isinstance(enable, bool):
+                logger.error(f"Invalid pressure limit enable: {enable}")
+                return False
+            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR}:
+                logger.error(f"Invalid log level: {log_level}")
+                return False
+        except ValueError as e:
+            logger.error(f"Invalid pressure limit enable: {e}")
+            return
+        
+        data = 1 if enable else 0
+        data = data .to_bytes(1, byteorder='little')
+        command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_ENABLE]) + data
+        # Send command
+        success = self._send_command(command)
+        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+            logger.debug("Command sent successfully for set pressure limit enable: {enable}")
+        return success
 
     def _send_command(self, command: bytes,log_level: Optional[LogLevel] = LogLevel.INFO) -> bool:
         """

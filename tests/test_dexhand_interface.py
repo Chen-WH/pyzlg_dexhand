@@ -336,6 +336,20 @@ class TestNewCommands:
         with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
             assert not mock_hand.set_pressure_limit_value(30)
             mock_send_command.assert_not_called()
+
+    def test_set_pressure_limit_enable(self, mock_hand):
+        """Test setting pressure limit enable"""
+        # Test valid pressure limit enable
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert mock_hand.set_pressure_limit_enable(True)
+            expected_data = 1 .to_bytes(1, 'little')
+            expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_ENABLE]) + expected_data
+            mock_send_command.assert_called_once_with(expected_command)
+
+        # Test invalid pressure limit enable
+        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
+            assert not mock_hand.set_pressure_limit_enable(2)
+            mock_send_command.assert_not_called()
     
 
 if __name__ == '__main__':
