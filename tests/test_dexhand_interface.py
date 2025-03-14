@@ -6,10 +6,14 @@ import yaml
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
+import time     # 添加这个导入
+import tempfile  # 添加这个导入
+import shutil    # 添加这个导入
+import datetime  # 添加这个导入
 
 from pyzlg_dexhand.dexhand_interface import (
     DexHandBase, LeftDexHand, RightDexHand, HandConfig,
-    JointFeedback, StampedTactileFeedback, HandFeedback
+    JointFeedback, StampedTactileFeedback, HandFeedback,LogLevel
 )
 from pyzlg_dexhand.dexhand_protocol import BoardID, MessageType, FlashStorageTable
 from pyzlg_dexhand.dexhand_protocol.commands import (
@@ -18,6 +22,8 @@ from pyzlg_dexhand.dexhand_protocol.commands import (
 from pyzlg_dexhand.dexhand_protocol.messages import (
     BoardFeedback, MotorFeedback, TactileFeedback, ErrorInfo, ProcessedMessage, BoardError
 )
+
+from pyzlg_dexhand.dexhand_logger import DexHandLogger
 
 # Test data generators
 def create_mock_feedback(timestamp=1000.0):
@@ -350,7 +356,89 @@ class TestNewCommands:
         with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
             assert not mock_hand.set_pressure_limit_enable(2)
             mock_send_command.assert_not_called()
-    
+
+    def test_log_level_behavior(self, mock_hand):
+        """Test log level behavior with different method and global levels"""
+        # Test scenario 1: Global log level INFO + Method log level INFO
+        # Expected: All levels of logs will be recorded
+        with patch('pyzlg_dexhand.dexhand_interface.logger') as mock_logger:
+            mock_hand.log_level = LogLevel.INFO
+            
+            # Call a method with various log levels
+            mock_hand.move_joints(log_level=LogLevel.INFO)
+            
+            # Verify that all levels of logs are recorded (simulating possible calls in the method)
+            mock_logger.info.assert_called()  # INFO should be called
+            
+            # Reset the mock and call another method with a different log level
+            mock_logger.reset_mock()
+            mock_hand.current_motor_control_torque("motor1", 300, log_level=LogLevel.INFO)
+            mock_logger.debug.assert_called()  # DEBUG should also be called
+        
+        # Test scenario 2: Global log level INFO + Method log level DEBUG
+        # Expected: Only DEBUG and ERROR levels of logs will be recorded, INFO level will not be recorded
+        with patch('pyzlg_dexhand.dexhand_interface.logger') as mock_logger:
+            mock_hand.log_level = LogLevel.INFO
+            
+            # Call a method with DEBUG level specified
+            mock_hand.set_safe_temperature(55, log_level=LogLevel.DEBUG)
+            
+            # Verify that only DEBUG and ERROR levels of logs are recorded
+            mock_logger.info.assert_not_called()  # INFO should not be called
+            mock_logger.debug.assert_called()     # DEBUG should be called
+            
+            # Reset and test another method
+            mock_logger.reset_mock()
+            mock_hand.current_motor_control_torque("motor1", 300, log_level=LogLevel.DEBUG)
+            mock_logger.info.assert_not_called()
+            mock_logger.debug.assert_called()
+        
+        # Test scenario 3: Global log level DEBUG + Method log level INFO 
+        # Expected: Method level overrides global level, all logs will be recorded
+        with patch('pyzlg_dexhand.dexhand_interface.logger') as mock_logger:
+            mock_hand.log_level = LogLevel.DEBUG
+            
+            # Call a method with INFO level specified
+            mock_hand.move_joints(55, log_level=LogLevel.INFO)
+            
+            # Verify that all logs are recorded
+            mock_logger.info.assert_called()
+            
+            # Reset and test another method
+            mock_logger.reset_mock()
+            mock_hand.reset_joints(log_level=LogLevel.INFO)
+            mock_logger.info.assert_called()
+        
+        # Test scenario 4: Global log level DEBUG + Method level not specified
+        # Expected: Use the global level, only DEBUG and ERROR logs will be recorded
+        with patch('pyzlg_dexhand.dexhand_interface.logger') as mock_logger:
+            mock_hand.log_level = LogLevel.DEBUG
+            
+            # Call methods without specifying log_level
+            mock_hand.reset_joints()
+            mock_hand.set_safe_temperature(55)
+            
+            # Verify that only DEBUG and ERROR levels of logs are recorded
+            mock_logger.info.assert_not_called()
+            mock_logger.debug.assert_called()
+        
+        # Test scenario 5: Global log level ERROR + Any method level
+        # Expected: Only ERROR logs will be recorded, INFO and DEBUG will not be recorded
+        with patch('pyzlg_dexhand.dexhand_interface.logger') as mock_logger:
+            mock_hand.log_level = LogLevel.ERROR
+            
+            # Without specifying method level
+            mock_hand.set_safe_temperature(55)
+            
+            # Verify that only ERROR level logs are recorded
+            mock_logger.info.assert_not_called()
+            mock_logger.debug.assert_not_called()
+            
+            # Also test method level override
+            mock_logger.reset_mock()
+            mock_hand.set_safe_temperature(55, log_level=LogLevel.DEBUG)
+            mock_logger.info.assert_not_called()
+            mock_logger.debug.assert_called()
 
 if __name__ == '__main__':
     pytest.main([__file__])

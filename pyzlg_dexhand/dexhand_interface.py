@@ -380,7 +380,7 @@ class DexHandBase:
             if not (0 <= value <= 20):
                 logger.error(f"Invalid pressure limit value: {value}")
                 return False
-            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR}:
+            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR,None}:
                 logger.error(f"Invalid log level: {log_level}")
                 return False
         except ValueError as e:
@@ -775,7 +775,7 @@ class DexHandBase:
         )
         if log_level is not None and log_level <= LogLevel.INFO:
             logger.info(f"Successfully for reset joints command")
-        if self.log_level <= LogLevel.INFO:
+        elif self.log_level <= LogLevel.INFO:
             logger.info(f"successfully for reset joints command")
 
     def close(self):
