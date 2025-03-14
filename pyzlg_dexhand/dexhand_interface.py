@@ -250,7 +250,7 @@ class DexHandBase:
         # Send command
         success = self._send_command(command)
 
-        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+        if self.log_level <= LogLevel.DEBUG and log_level <= LogLevel.DEBUG:
             logger.debug("Command sent successfully for set safe temperature: {safe_temperature}")
         return success
 
@@ -301,7 +301,7 @@ class DexHandBase:
 
         # Send command
         success = self._send_command(command)
-        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+        if self.log_level <= LogLevel.DEBUG and log_level <= LogLevel.DEBUG:
             logger.debug("Command sent successfully for {motor_type} control torque: {current}")
         return success
 
@@ -349,7 +349,7 @@ class DexHandBase:
             command2 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR2]) + data
             # Send command
             success = self._send_command(command1) and self._send_command(command2)
-        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+        if self.log_level <= LogLevel.DEBUG and log_level <= LogLevel.DEBUG:
             logger.debug("Command sent successfully for set {motor_type} stall time: {stall_time}")
         return success
     
@@ -385,7 +385,7 @@ class DexHandBase:
 
         # Send command
         success = self._send_command(command)
-        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+        if self.log_level <= LogLevel.DEBUG and log_level <= LogLevel.DEBUG:
             logger.debug("Command sent successfully for set pressure limit value: {value}")
         return success
     
@@ -420,7 +420,7 @@ class DexHandBase:
         command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_ENABLE]) + data
         # Send command
         success = self._send_command(command)
-        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+        if self.log_level <= LogLevel.DEBUG and log_level <= LogLevel.DEBUG:
             logger.debug("Command sent successfully for set pressure limit enable: {enable}")
         return success
 
@@ -435,7 +435,7 @@ class DexHandBase:
             bool: Returns True if set successfully, False otherwise
         """
         try:
-            if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+            if self.log_level <= LogLevel.DEBUG and log_level <= LogLevel.DEBUG:
             # Record the original instruction data sent
                 logger.debug(f"Sending command: {command.hex()}")
             # Send commands to all boards
@@ -497,7 +497,7 @@ class DexHandBase:
         messages = self.zcan.receive_fd_messages(self.config.channel)
 
         # Record the received original feedback data
-        if self.log_level <= LogLevel.DEBUG or log_level <= LogLevel.DEBUG:
+        if self.log_level <= LogLevel.DEBUG and log_level <= LogLevel.DEBUG:
             for msg_id, data, timestamp in messages:
                 logger.debug(f"Received feedback: msg_id={msg_id}, data={data.hex()}, timestamp={timestamp}")
 
@@ -631,7 +631,7 @@ class DexHandBase:
                 )
                 if not success:
                     logger.error(f"Failed to send command to board {board_idx}")
-        if self.log_level <= LogLevel.INFO or log_level <= LogLevel.INFO:
+        if self.log_level <= LogLevel.INFO and log_level <= LogLevel.INFO:
             logger.info(f"successfully for move joints command")
 
 
@@ -748,7 +748,7 @@ class DexHandBase:
             control_mode=ControlMode.IMPEDANCE_GRASP,
             log_level=log_level
         )
-        if self.log_level <= LogLevel.INFO or log_level <= LogLevel.INFO:
+        if self.log_level <= LogLevel.INFO and log_level <= LogLevel.INFO:
             logger.info(f"successfully for reset joints command")
 
     def close(self):
