@@ -206,7 +206,7 @@ class DexHandLogger:
         """Save session metadata
 
         Args:
-            metadata: Dictionary of metadata to save
+            metadata: Dicti= LogLevel.INFOonary of metadata to save
         """
         metadata_path = self.session_dir / "metadata.json"
         # Write metadata directly since this isn't in the critical path
@@ -339,7 +339,7 @@ class DexHandLogger:
         if show:
             plt.show()
 
-    def close(self, log_level: Optional[LogLevel] = LogLevel.INFO):
+    def close(self, log_level: Optional[LogLevel] = None):
         """
         Close the logger and save any remaining data
 
@@ -368,7 +368,10 @@ class DexHandLogger:
 
         # Stop the writer thread and close files
         self.writer.stop()
-        if self.log_level <= LogLevel.INFO or log_level <= LogLevel.INFO:
+        if log_level is not None:
+            if log_level <= LogLevel.INFO:
+                logger.info(f"Logging session completed: {stats}")
+        elif self.log_level <= LogLevel.INFO:
             logger.info(f"Logging session completed: {stats}")
 
         # Generate plots
