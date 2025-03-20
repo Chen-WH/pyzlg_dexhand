@@ -3,7 +3,7 @@ import os
 import yaml
 
 
-from ros_compat import ROSNode, ROSTime
+from ros_compat import ROSNode,ROSTime
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 import argparse

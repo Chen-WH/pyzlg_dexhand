@@ -16,6 +16,7 @@ from .dexhand_protocol.commands import (
     ClearErrorCommand,
     FeedbackConfigCommand,
     FeedbackMode,
+    encode_command,
 )
 from .dexhand_protocol.messages import (
     BoardFeedback,
@@ -24,6 +25,7 @@ from .dexhand_protocol.messages import (
     ProcessedMessage,
     FlashStorageTable,
     LogLevel,
+    process_message,
 )
 
 
@@ -46,9 +48,8 @@ class BoardState:
     status_timestamp: float  # Timestamp of last status (normal / error) update
     is_normal: bool  # True if board is in normal state
     feedback: Optional[BoardFeedback] = None  # Last feedback received
-    error_info: Optional[ErrorInfo] = (
-        None  # Error information if board is in error state
-    )
+    error_info: Optional[ErrorInfo] = None  # Error information if board is in error state
+
 
 
 @dataclass
@@ -201,7 +202,7 @@ class DexHandBase:
         command = FeedbackConfigCommand(mode=mode, period_ms=period_ms, enable=enable)
 
         try:
-            msg_type, data = protocol.commands.encode_command(command)
+            msg_type, data = encode_command(command)
         except ValueError as e:
             logger.error(f"Failed to encode feedback config command: {e}")
             return False
@@ -496,7 +497,7 @@ class DexHandBase:
         )
 
         try:
-            msg_type, data = protocol.commands.encode_command(command)
+            msg_type, data = encode_command(command)
         except ValueError as e:
             logger.error(f"Failed to encode command: {e}")
             return False
@@ -527,7 +528,7 @@ class DexHandBase:
         # Process all received messages
         for msg_id, data, timestamp in messages:
             try:
-                result = protocol.messages.process_message(msg_id, data)
+                result = process_message(msg_id, data)
                 board_idx = msg_id - result.msg_type - self.base_id
 
                 if result.msg_type == MessageType.MOTION_FEEDBACK:
@@ -561,7 +562,7 @@ class DexHandBase:
         """
         # Create and encode clear error command
         clear_cmd = ClearErrorCommand()
-        msg_type, clear_data = protocol.commands.encode_command(clear_cmd)
+        msg_type, clear_data = encode_command(clear_cmd)
         clear_cmd_id = self._get_command_id(msg_type, board_idx)
 
         # Send command
