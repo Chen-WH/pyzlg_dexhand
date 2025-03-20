@@ -11,7 +11,7 @@ import time
 import yaml
 import os.path
 
-from pyzlg_dexhand.dexhand_interface import (
+from pyzlg_dexhand.pyzlg_dexhand.dexhand_interface import (
     DexHandBase,
     LeftDexHand,
     RightDexHand,

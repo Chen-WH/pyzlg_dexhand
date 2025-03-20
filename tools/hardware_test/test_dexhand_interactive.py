@@ -5,7 +5,7 @@ import argparse
 from typing import List
 from IPython import embed
 
-from pyzlg_dexhand.dexhand_interface import (
+from pyzlg_dexhand.pyzlg_dexhand.dexhand_interface import (
     LeftDexHand,
     RightDexHand,
     ControlMode,

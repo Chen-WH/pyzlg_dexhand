@@ -11,7 +11,7 @@ import tempfile  # 添加这个导入
 import shutil    # 添加这个导入
 import datetime  # 添加这个导入
 
-from pyzlg_dexhand.dexhand_interface import (
+from pyzlg_dexhand.pyzlg_dexhand.dexhand_interface import (
     DexHandBase, LeftDexHand, RightDexHand, HandConfig,
     JointFeedback, StampedTactileFeedback, HandFeedback,LogLevel
 )

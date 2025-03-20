@@ -214,7 +214,7 @@ def _decode_error(data: bytes) -> ErrorInfo:
 
     try:
         # Standard error message format (0xEE)
-        if data[0] == 0xEE:
+        if data[0] == ErrorMessageType.MOTOR_ERROR:
             if len(data) < 3:
                 raise ValueError("Invalid standard error message format")
                 
@@ -243,7 +243,7 @@ def _decode_error(data: bytes) -> ErrorInfo:
             description = "; ".join(descriptions) if descriptions else "Unknown motor error"
             
         # Warning message format (0xEF)
-        elif data[0] == 0xEF:
+        elif data[0] == ErrorMessageType.WARNING:
             if len(data) < 3:
                 raise ValueError("Invalid warning message format")
                 
@@ -256,7 +256,8 @@ def _decode_error(data: bytes) -> ErrorInfo:
                 description = f"Warning: Unknown code 0x{data[2]:02x}"
             
         # Overheat error format (0xFF sequence)
-        elif data[0] == 0xFF and len(data) >= 6 and all(b == 0xFF for b in data[0:6]):
+        elif data[0] == ErrorMessageType.OVERHEATING and len(data) >= 6 and all(b == 0xFF for b in data[0:6]):
+            logger.error(f"Warning: Overheating detected. Please power off the device and let it rest.")
             error_type = BoardError.BOTH_MOTORS_ERROR
             error_data = b'\xFF\xFF'
             description = "Critical error: System overheated"

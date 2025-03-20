@@ -9,7 +9,7 @@ import numpy as np
 from unittest.mock import patch, Mock
 
 from pyzlg_dexhand.dexhand_logger import DexHandLogger
-from pyzlg_dexhand.dexhand_interface import (
+from work.pyzlg_dexhand.pyzlg_dexhand.dexhand_interface import (
     HandFeedback, JointFeedback, StampedTactileFeedback,
     ControlMode, LogLevel
 )
