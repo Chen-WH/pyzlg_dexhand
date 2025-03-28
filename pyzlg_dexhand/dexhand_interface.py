@@ -73,6 +73,12 @@ class StampedTactileFeedback:
     direction: int  # Force direction (0-359 degrees, fingertip is 0)
     proximity: int  # Proximity value (raw units)
     temperature: int  # Temperature in Celsius
+    encoder1: int   # Raw encoder 1 value (0-4095)
+    encoder2: int   # Raw encoder 2 value (0-4095)
+    motor1_error: int   # Motor 1 error code
+    motor2_error: int   # Motor 2 error code
+    impedance1: float    # Motor 1 impedance reading
+    impedance2: float    # Motor 2 impedance reading
 
 
 @dataclass
