@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from pyzlg_dexhand.pyzlg_dexhand.dexhand_interface import (
+from pyzlg_dexhand.dexhand_interface import (
     LeftDexHand,
     RightDexHand,
     ControlMode,
