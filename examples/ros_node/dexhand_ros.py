@@ -99,9 +99,13 @@ class DexHandNode(ROSNode):
         control_mode = config.get("mode", "impedance_grasp")
         send_rate = config.get("rate", 100.0)
         filter_alpha = config.get("alpha", 0.1)
-        self.command_topic = config.get("topic", "/joint_commands")
-        self.joint_feedback_topic = config.get("joint_feedback_topic", "/joint_states")
-        self.touch_feedback_topic = config.get("touch_feedback_topic", "/touch_sensors")
+        self.left_hand_command_topic = config.get("left_hand_command_topic", "/left_hand_joint_commands")
+        self.right_hand_command_topic = config.get("right_hand_command_topic", "/right_hand_joint_commands")
+        self.left_hand_joint_feedback_topic = config.get("left_hand_joint_feedback_topic", "/left_hand_joint_states")
+        self.left_touch_feedback_topic = config.get("left_touch_feedback_topic", "/left_touch_sensors")
+        self.right_hand_joint_feedback_topic = config.get("right_hand_joint_feedback_topic", "/left_hand_joint_states")
+        self.right_touch_feedback_topic = config.get("right_touch_feedback_topic", "/right_touch_sensors")
+
         self.is_mock = config.get("mock", False)
 
         # Add feedback configuration
@@ -174,18 +178,25 @@ class DexHandNode(ROSNode):
                     self.last_joint_positions[hand][joint_name] = 0.0
 
         # Initialize command subscriber with configurable topic
-        self.create_subscription(JointState, self.command_topic, self.command_callback)
+        self.create_subscription(JointState, self.left_hand_command_topic, self.left_hand_command_callback)
+        self.create_subscription(JointState, self.right_hand_command_topic, self.right_hand_command_callback)
 
         # Initialize reset service
         self.create_service(Trigger, "reset_hands", self.reset_callback)
 
         # Initialize publishers for feedback
         if self.enable_feedback:
-            self.joint_state_pub = self.create_publisher(
-                JointState, self.joint_feedback_topic, 10
+            self.left_hand_joint_state_pub = self.create_publisher(
+                JointState, self.left_hand_joint_feedback_topic, 10
             )
-            self.touch_sensor_pub = self.create_publisher(
-                Float32MultiArray, self.touch_feedback_topic, 10
+            self.right_hand_joint_state_pub = self.create_publisher(
+                JointState, self.right_hand_joint_feedback_topic, 10
+            )
+            self.left_touch_sensor_pub = self.create_publisher(
+                Float32MultiArray, self.left_touch_feedback_topic, 10
+            )
+            self.right_touch_sensor_pub = self.create_publisher(
+                Float32MultiArray, self.right_touch_feedback_topic, 10
             )
 
 
@@ -202,7 +213,7 @@ class DexHandNode(ROSNode):
             f"  Feedback enabled: {self.enable_feedback}\n"
         )
 
-    def command_callback(self, msg: JointState):
+    def right_hand_command_callback(self, msg: JointState):
         """Handle incoming joint commands"""
         try:
             # Create dictionary of joint values
@@ -229,7 +240,36 @@ class DexHandNode(ROSNode):
                             ) * self.last_commands[hand][
                                 joint
                             ] + self.filter_alpha * value
+        except Exception as e:
+            self.logger.error(f"Error in command callback: {str(e)}")
 
+    def left_hand_command_callback(self, msg: JointState):
+        """Handle incoming joint commands"""
+        try:
+            # Create dictionary of joint values
+            joint_values = {}
+            for name, pos in zip(msg.name, msg.position):
+                joint_values[name] = pos
+
+            # Process command for each hand
+            for hand, mapping in self.joint_mappings.items():
+                # Map to hardware joints
+                command = mapping.map_command(joint_values)
+
+                # Apply low-pass filter
+                if not self.last_commands[hand]:
+                    # First command, no filtering
+                    self.last_commands[hand] = command
+                else:
+                    for joint, value in command.items():
+                        if joint not in self.last_commands[hand]:
+                            self.last_commands[hand][joint] = value
+                        else:
+                            self.last_commands[hand][joint] = (
+                                1 - self.filter_alpha
+                            ) * self.last_commands[hand][
+                                joint
+                            ] + self.filter_alpha * value
         except Exception as e:
             self.logger.error(f"Error in command callback: {str(e)}")
 
@@ -262,6 +302,7 @@ class DexHandNode(ROSNode):
 
                 # Get and publish feedback if enabled
                 if self.enable_feedback:
+                    # print(hand)
                     self.process_and_publish_feedback(hand)
 
         except Exception as e:
@@ -270,67 +311,130 @@ class DexHandNode(ROSNode):
     def process_and_publish_feedback(self, hand: str):
         """Get feedback from hardware and publish to ROS topics"""
         try:
-            # Get feedback from hand
-            feedback = self.hands[hand].get_feedback()
+            if hand == "left":
+                # Get feedback from hand
+                feedback_left = self.hands[hand].get_feedback()
 
-            # Process joint positions and estimate velocities
-            pos_dict = {}
-            vel_dict = {}
-            for joint_name, joint_feedback in feedback.joints.items():
-                # Get position
-                position = joint_feedback.angle
+                # Process joint positions and estimate velocities
+                left_pos_dict = {}
+                left_vel_dict = {}
+                for joint_name, joint_feedback_left in feedback_left.joints.items():
+                    # Get position
+                    left_position = joint_feedback_left.angle
+                    # Update the Kalman filter with new measurement
+                    kalman_filter_left = self.kalman_filters[hand][joint_name]
+                    if not np.isnan(left_position):
+                        kalman_filter_left.step(left_position)
+                    left_state = kalman_filter_left.get_current_state()
 
-                # Update the Kalman filter with new measurement
-                kalman_filter = self.kalman_filters[hand][joint_name]
-                if not np.isnan(position):
-                    kalman_filter.step(position)
-                state = kalman_filter.get_current_state()
+                    # Extract position (state[0]) and velocity (state[1])
+                    left_velocity = left_state[1][0]  # Extract velocity in deg/s
 
-                # Extract position (state[0]) and velocity (state[1])
-                velocity = state[1][0]  # Extract velocity in deg/s
+                    # Save position and velocity to dictionaries
+                    left_pos_dict[joint_name] = left_position
+                    left_vel_dict[joint_name] = left_velocity
 
-                # Save position and velocity to dictionaries
-                pos_dict[joint_name] = position
-                vel_dict[joint_name] = velocity
+                # Convert hardware feedback to URDF joint names
+                left_pos_dict_urdf = self.joint_mappings[hand].map_feedback(left_pos_dict)
+                left_vel_dict_urdf = self.joint_mappings[hand].map_feedback(left_vel_dict)
 
-            # Convert hardware feedback to URDF joint names
-            pos_dict_urdf = self.joint_mappings[hand].map_feedback(pos_dict)
-            vel_dict_urdf = self.joint_mappings[hand].map_feedback(vel_dict)
+                # Construct and publish joint state message
+                left_hand_joint_state_msg = JointState()
+                left_hand_joint_state_msg.header.stamp = self.get_ros_time().to_msg()
+                left_hand_joint_state_msg.name = self.joint_mappings[hand].joint_names
+                left_hand_joint_state_msg.position = [left_pos_dict_urdf.get(joint, 0.0) for joint in left_hand_joint_state_msg.name]
+                left_hand_joint_state_msg.velocity = [left_vel_dict_urdf.get(joint, 0.0) for joint in left_hand_joint_state_msg.name]
+                self.left_hand_joint_state_pub.publish(left_hand_joint_state_msg)
 
-            # Construct and publish joint state message
-            joint_state_msg = JointState()
-            joint_state_msg.header.stamp = self.get_ros_time().to_msg()
-            joint_state_msg.name = self.joint_mappings[hand].joint_names
-            joint_state_msg.position = [pos_dict_urdf.get(joint, 0.0) for joint in joint_state_msg.name]
-            joint_state_msg.velocity = [vel_dict_urdf.get(joint, 0.0) for joint in joint_state_msg.name]
-            self.joint_state_pub.publish(joint_state_msg)
+                # Process tactile feedback
+                if feedback_left.tactile:
+                    left_touch_msg = Float32MultiArray()
+                    left_touch_msg.data = [0.0] * 70  # Default to 0 for all fingertips, 5 fingers * 14 sensor data
 
-            # Process tactile feedback
-            if feedback.tactile:
-                touch_msg = Float32MultiArray()
-                touch_msg.data = [0.0] * 70  # Default to 0 for all fingertips, 5 fingers * 14 sensor data
+                    # Map feedback to correct indices (thumb, index, middle, ring, pinky)
+                    for finger_name, tactile_data in feedback_left.tactile.items():
+                        if finger_name in self.fingertip_mapping:
+                            idx = self.fingertip_mapping[finger_name]
+                            left_touch_msg.data[14*idx] = tactile_data.timestamp
+                            left_touch_msg.data[14*idx+1] = tactile_data.normal_force
+                            left_touch_msg.data[14*idx+2] = tactile_data.normal_force_delta
+                            left_touch_msg.data[14*idx+3] = tactile_data.tangential_force
+                            left_touch_msg.data[14*idx+4] = tactile_data.tangential_force_delta
+                            left_touch_msg.data[14*idx+5] = tactile_data.direction
+                            left_touch_msg.data[14*idx+6] = tactile_data.proximity
+                            left_touch_msg.data[14*idx+7] = tactile_data.temperature
+                            left_touch_msg.data[14*idx+8] = tactile_data.encoder1
+                            left_touch_msg.data[14*idx+9] = tactile_data.encoder2
+                            left_touch_msg.data[14*idx+10] = tactile_data.motor1_error
+                            left_touch_msg.data[14*idx+11] = tactile_data.motor2_error
+                            left_touch_msg.data[14*idx+12] = tactile_data.impedance1
+                            left_touch_msg.data[14*idx+13] = tactile_data.impedance2
 
-                # Map feedback to correct indices (thumb, index, middle, ring, pinky)
-                for finger_name, tactile_data in feedback.tactile.items():
-                    if finger_name in self.fingertip_mapping:
-                        idx = self.fingertip_mapping[finger_name]
-                        touch_msg.data[14*idx] = tactile_data.timestamp
-                        touch_msg.data[14*idx+1] = tactile_data.normal_force
-                        touch_msg.data[14*idx+2] = tactile_data.normal_force_delta
-                        touch_msg.data[14*idx+3] = tactile_data.tangential_force
-                        touch_msg.data[14*idx+4] = tactile_data.tangential_force_delta
-                        touch_msg.data[14*idx+5] = tactile_data.direction
-                        touch_msg.data[14*idx+6] = tactile_data.proximity
-                        touch_msg.data[14*idx+7] = tactile_data.temperature
-                        touch_msg.data[14*idx+8] = tactile_data.encoder1
-                        touch_msg.data[14*idx+9] = tactile_data.encoder2
-                        touch_msg.data[14*idx+10] = tactile_data.motor1_error
-                        touch_msg.data[14*idx+11] = tactile_data.motor2_error
-                        touch_msg.data[14*idx+12] = tactile_data.impedance1
-                        touch_msg.data[14*idx+13] = tactile_data.impedance2
+                    # Publish tactile data
+                    self.left_touch_sensor_pub.publish(left_touch_msg)
+                
+            elif hand == "right":
+                # Get feedback from hand
+                feedback_right = self.hands[hand].get_feedback()
 
-                # Publish tactile data
-                self.touch_sensor_pub.publish(touch_msg)
+                # Process joint positions and estimate velocities
+                right_pos_dict = {}
+                right_vel_dict = {}
+                for joint_name, joint_feedback_right in feedback_right.joints.items():
+                    # Get position
+                    right_position = joint_feedback_right.angle
+                    # Update the Kalman filter with new measurement
+                    kalman_filter_right = self.kalman_filters[hand][joint_name]
+                    if not np.isnan(right_position):
+                        kalman_filter_right.step(right_position)
+                    right_state = kalman_filter_right.get_current_state()
+
+                    # Extract position (state[0]) and velocity (state[1])
+                    right_velocity = right_state[1][0]  # Extract velocity in deg/s
+
+                    # Save position and velocity to dictionaries
+                    right_pos_dict[joint_name] = right_position
+                    right_vel_dict[joint_name] = right_velocity
+
+                # Convert hardware feedback to URDF joint names
+                right_pos_dict_urdf = self.joint_mappings[hand].map_feedback(right_pos_dict)
+                right_vel_dict_urdf = self.joint_mappings[hand].map_feedback(right_vel_dict)
+
+                # Construct and publish joint state message
+                right_hand_joint_state_msg = JointState()
+                right_hand_joint_state_msg.header.stamp = self.get_ros_time().to_msg()
+                right_hand_joint_state_msg.name = self.joint_mappings[hand].joint_names
+                right_hand_joint_state_msg.position = [right_pos_dict_urdf.get(joint, 0.0) for joint in right_hand_joint_state_msg.name]
+                right_hand_joint_state_msg.velocity = [right_vel_dict_urdf.get(joint, 0.0) for joint in right_hand_joint_state_msg.name]
+                self.right_hand_joint_state_pub.publish(right_hand_joint_state_msg)
+
+                # Process tactile feedback
+                if feedback_right.tactile:
+                    right_touch_msg = Float32MultiArray()
+                    right_touch_msg.data = [0.0] * 70  # Default to 0 for all fingertips, 5 fingers * 14 sensor data
+
+                    # Map feedback to correct indices (thumb, index, middle, ring, pinky)
+                    for finger_name, tactile_data in feedback_right.tactile.items():
+                        if finger_name in self.fingertip_mapping:
+                            idx = self.fingertip_mapping[finger_name]
+                            right_touch_msg.data[14*idx] = tactile_data.timestamp
+                            right_touch_msg.data[14*idx+1] = tactile_data.normal_force
+                            right_touch_msg.data[14*idx+2] = tactile_data.normal_force_delta
+                            right_touch_msg.data[14*idx+3] = tactile_data.tangential_force
+                            right_touch_msg.data[14*idx+4] = tactile_data.tangential_force_delta
+                            right_touch_msg.data[14*idx+5] = tactile_data.direction
+                            right_touch_msg.data[14*idx+6] = tactile_data.proximity
+                            right_touch_msg.data[14*idx+7] = tactile_data.temperature
+                            right_touch_msg.data[14*idx+8] = tactile_data.encoder1
+                            right_touch_msg.data[14*idx+9] = tactile_data.encoder2
+                            right_touch_msg.data[14*idx+10] = tactile_data.motor1_error
+                            right_touch_msg.data[14*idx+11] = tactile_data.motor2_error
+                            right_touch_msg.data[14*idx+12] = tactile_data.impedance1
+                            right_touch_msg.data[14*idx+13] = tactile_data.impedance2
+
+                    # Publish tactile data
+                    self.right_touch_sensor_pub.publish(right_touch_msg)
+
 
         except Exception as e:
             self.logger.error(f"Error processing feedback: {str(e)}")
@@ -362,9 +466,14 @@ class DexHandNode(ROSNode):
             time.sleep(0.5)
 
             # Then straighten to 0 degrees
-            for hand in self.hands.values():
-                hand.reset_joints()
-                hand.clear_errors()
+            for _ in range(2):
+                for hand in self.hands.values():
+
+                    hand.reset_joints()
+                    time.sleep(0.005)
+                    hand.clear_errors()
+                    time.sleep(0.005)
+
 
             # Clear command history
             for hand in self.hands:

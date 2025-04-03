@@ -778,7 +778,7 @@ class DexHandBase:
             rf_dip=0,
             lf_mcp=0,
             lf_dip=0,
-            control_mode=ControlMode.IMPEDANCE_GRASP,
+            control_mode=ControlMode.CASCADED_PID,
             log_level=log_level
         )
         if log_level is not None and log_level <= LogLevel.INFO:

@@ -1,10 +1,10 @@
 DexHand:
   # Configuration for left/right dexterous hand
   left_hand:
-    channel: 1
+    channel: 0
     hall_scale: [2.1, 2.1, 1.8, 4.0, 2.2, 1.6, 2.2, 1.6, 2.2, 1.6, 2.2, 1.6]  # Scale coefficients for hall position mode; do not edit unless you know what you are doing
   right_hand:
-    channel: 0
+    channel: 1
     hall_scale: [2.1, 2.1, 1.8, 4.0, 2.2, 1.6, 2.2, 1.6, 2.2, 1.6, 2.2, 1.6]  # Scale coefficients for hall position mode; do not edit unless you know what you are doing
 
   ROS_Node:
@@ -18,9 +18,13 @@ DexHand:
     alpha: 0.2  # Low-pass filter intensity (0-1)
 
     # Topic configuration
-    command_topic: '/joint_commands'  # Topic to subscribe for joint commands
-    joint_feedback_topic: '/joint_states'  # Topic to publish joint positions & velocities
-    touch_feedback_topic: '/touch_sensors'  # Topic to publish touch sensor readings
+    left_hand_command_topic: '/left_hand_joint_commands'  # Topic to subscribe for joint commands
+    righr_hand_command_topic: '/right_hand_joint_commands'  # Topic to subscribe for joint commands
+    left_hand_joint_feedback_topic: '/left_hand_joint_states'  # Topic to publish joint positions & velocities
+    left_touch_feedback_topic: '/left_touch_sensors'  # Topic to publish touch sensor readings
+    right_hand_joint_feedback_topic: '/right_hand_joint_states'  # Topic to publish joint positions & velocities
+    right_touch_feedback_topic: '/right_touch_sensors'  # Topic to publish touch sensor readings
+
 
     # Feedback configuration
     enable_feedback: true   # Enable/disable feedback publishing

@@ -62,7 +62,7 @@ class DexHandTestNode(ROSNode):
 
         # Create publisher for commands
         self.cmd_pub = self.create_publisher(
-            JointState, "joint_commands", 10  # Using global joint states topic
+            JointState, "left_hand_joint_commands", 10  # Using global joint states topic
         )
 
         # Create dictionary for current joint positions
