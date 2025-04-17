@@ -15,8 +15,12 @@ from .dexhand_protocol.commands import (
     MotorCommand,
     ClearErrorCommand,
     FeedbackConfigCommand,
+    BroadcastCommand,
+    encode_broadcast_command,
     FeedbackMode,
     encode_command,
+    GlobalCommand,
+    GlobalFunctionCode,
 )
 from .dexhand_protocol.messages import (
     BoardFeedback,
@@ -73,6 +77,12 @@ class StampedTactileFeedback:
     direction: int  # Force direction (0-359 degrees, fingertip is 0)
     proximity: int  # Proximity value (raw units)
     temperature: int  # Temperature in Celsius
+    encoder1: int   # Raw encoder 1 value (0-4095)
+    encoder2: int   # Raw encoder 2 value (0-4095)
+    motor1_error: int   # Motor 1 error code
+    motor2_error: int   # Motor 2 error code
+    impedance1: float    # Motor 1 impedance reading
+    impedance2: float    # Motor 2 impedance reading
 
 
 @dataclass
@@ -258,12 +268,14 @@ class DexHandBase:
             logger.debug("Command sent successfully for set safe temperature: {safe_temperature}")
         return success
 
+    # this usage has been deprecated
     def current_motor_control_torque(
             self, 
             motor_type: str, 
             current: int,
             log_level: Optional[LogLevel] = None) -> bool:
         """
+        ***this usage has been deprecated***
         Set the motor torque.
 
         Args:
@@ -475,6 +487,10 @@ class DexHandBase:
         motor2_pos: int,
         motor_enable: int = 0x03,
         control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
+        motor1_speed: Optional[int] = None,
+        motor2_speed: Optional[int] = None,
+        motor1_current: Optional[int] = None,
+        motor2_current: Optional[int] = None,
     ) -> bool:
         """Send a motion command to a specific board
 
@@ -494,6 +510,10 @@ class DexHandBase:
             motor_enable=motor_enable,
             motor1_pos=motor1_pos,
             motor2_pos=motor2_pos,
+            motor1_speed=motor1_speed,
+            motor2_speed=motor2_speed,
+            motor1_current=motor1_current,
+            motor2_current=motor2_current,
         )
 
         try:
@@ -509,6 +529,124 @@ class DexHandBase:
             return False
 
         return True
+    
+    def send_broadcast_control_frame(
+        self,
+        control_mode: ControlMode,
+        enable_motors: List[bool] = None,  # 12 booleans for each motor
+        clear_error: bool = False,
+        request_feedback: bool = True,
+        is_right_hand: bool = False,
+        positions: List[int] = None,  # 12 positions corresponding to each motor
+        speeds: List[int] = None,     # 12 speeds corresponding to each motor
+        currents: List[int] = None,   # 12 currents corresponding to each motor
+        log_level: Optional[LogLevel] = None
+    ) -> bool:
+        """Send a broadcast control frame to control all motors at once with CAN ID 0x100.
+        
+        Args:
+            control_mode: Control mode enum
+            enable_motors: List of 12 booleans indicating which motors to enable, in order:
+                [th_dip, th_mcp, th_rot, ff_spr, ff_dip, ff_mcp, mf_dip, mf_mcp, rf_dip, rf_mcp, lf_dip, lf_mcp]
+            clear_error: Whether to clear errors
+            request_feedback: Whether to request feedback
+            is_right_hand: True for right hand, False for left hand
+            positions: List of 12 position values corresponding to each motor (-32768 to 32767)
+            speeds: List of 12 speed values corresponding to each motor (0 to 32767)
+            currents: List of 12 current values corresponding to each motor (10 to 599 mA)
+            log_level: Logging level for this operation
+                    
+        Returns:
+            bool: True if command sent successfully
+        """
+        # Default to all motors enabled if not specified
+        if enable_motors is None:
+            enable_motors = [True] * 12
+        
+        # Default values for positions, speeds, currents
+        if positions is None:
+            positions = [0] * 12
+        if speeds is None:
+            speeds = [15000] * 12  # Default speed: 15000
+        if currents is None:
+            currents = [20] * 12   # Default current: 20mA
+        
+        # Create broadcast command
+        command = BroadcastCommand(
+            control_mode=control_mode,
+            enable_motors=enable_motors,
+            clear_error=clear_error,
+            request_feedback=request_feedback,
+            is_right_hand=is_right_hand,
+            positions=positions,
+            speeds=speeds,
+            currents=currents
+        )
+        
+        try:
+            # Encode command using the function from commands.py
+            frame_data = encode_broadcast_command(command)
+            
+            # Log debug information if requested
+            if (log_level is not None and log_level <= LogLevel.DEBUG) or self.log_level <= LogLevel.DEBUG:
+                logger.debug(f"Sending broadcast control frame: {frame_data.hex()}")
+            
+            # Send the frame with ID 0x100
+            if not self.zcan.send_fd_message(self.config.channel, 0x100, frame_data):
+                logger.error("Failed to send broadcast control frame")
+                return False
+            
+            # Log success information if requested
+            if (log_level is not None and log_level <= LogLevel.INFO) or self.log_level <= LogLevel.INFO:
+                logger.info("Successfully sent broadcast control frame")
+                
+            return True
+            
+        except ValueError as e:
+            logger.error(f"Failed to encode broadcast command: {e}")
+            return False
+        
+    def send_global_command(
+        self,
+        function_code: GlobalFunctionCode, 
+        data: bytes = b'', 
+        log_level: Optional[LogLevel] = None
+    ) -> bool:
+        """Send a global broadcast command to all boards.
+        
+        Args:
+            function_code: The global function code
+            data: Optional data for the command (max 6 bytes)
+            log_level: Logging level for this operation
+                    
+        Returns:
+            bool: True if command sent successfully
+        """
+        # 
+        command = GlobalCommand(function_code=function_code, data=data)
+        
+        try:
+            # Encode command using the function from commands.py
+            msg_type, cmd_data = encode_command(command)
+            
+            # Log debug information if requested
+            if (log_level is not None and log_level <= LogLevel.DEBUG) or self.log_level <= LogLevel.DEBUG:
+                logger.debug(f"Sending global command: function_code={function_code}, data={data.hex() if data else 'None'}")
+            
+            # Send the command
+            if not self.zcan.send_fd_message(self.config.channel, msg_type, cmd_data):
+                logger.error(f"Failed to send global command: {function_code}")
+                return False
+            
+            # Log success information if requested
+            if (log_level is not None and log_level <= LogLevel.INFO) or self.log_level <= LogLevel.INFO:
+                logger.info(f"Successfully sent global command: {function_code}")
+                
+            return True
+            
+        except ValueError as e:
+            logger.error(f"Failed to encode global command: {e}")
+            return False
 
     def _refresh_board_states(self,log_level: Optional[LogLevel] = None):
         """Receive CANFD frames to update the states for all boards."""
@@ -585,8 +723,12 @@ class DexHandBase:
         rf_dip: Optional[float] = None,  # ring finger coupled distal joints
         lf_mcp: Optional[float] = None,  # little finger metacarpophalangeal
         lf_dip: Optional[float] = None,  # little finger coupled distal joints
-        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
-        log_level: Optional[LogLevel] = None, # log level
+        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,# Control mode
+        motor1_speed: Optional[int] = 15000,  # Motor 1 speed
+        motor2_speed: Optional[int] = 15000,  # Motor 2 speed
+        motor1_current: Optional[int] = 20,  # Motor 1 current
+        motor2_current: Optional[int] = 20,  # Motor 2 current
+        log_level: Optional[LogLevel] = LogLevel.ERROR, # log level
     ):
         """Move hand joints to specified angles.
 
@@ -612,6 +754,11 @@ class DexHandBase:
             lf_mcp: Little MCP flexion
             lf_dip: Little coupled PIP-DIP flexion
             control_mode: Motor control mode
+            motor1_speed: Motor 1 speed (0-32767)
+            motor2_speed: Motor 2 speed (0-32767)
+            motor1_current: Motor 1 current (10-599mA)
+            motor2_current: Motor 2 current (10-599mA)
+            log_level: Log level for logging
         """
         # Record command start time
         command_timestamp = time.time()
@@ -652,6 +799,10 @@ class DexHandBase:
                     motor2_pos=int(scaled_positions[base_idx + 1]),
                     motor_enable=motor_enable,
                     control_mode=control_mode,
+                    motor1_speed=motor1_speed,
+                    motor2_speed=motor2_speed,
+                    motor1_current=motor1_current,
+                    motor2_current=motor2_current,
                 )
                 if not success:
                     logger.error(f"Failed to send command to board {board_idx}")
@@ -659,6 +810,92 @@ class DexHandBase:
             logger.info(f"successfully for move joints command")
         elif self.log_level <= LogLevel.INFO:
             logger.info(f"successfully for move joints command")
+
+    def broadcast_move_joints(
+        self,
+        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
+        th_rot: Optional[float] = None,  # thumb rotation
+        th_mcp: Optional[float] = None,  # thumb metacarpophalangeal
+        th_dip: Optional[float] = None,  # thumb coupled distal joints
+        ff_spr: Optional[float] = None,  # four-finger spread
+        ff_mcp: Optional[float] = None,  # first finger metacarpophalangeal
+        ff_dip: Optional[float] = None,  # first finger coupled distal joints
+        mf_mcp: Optional[float] = None,  # middle finger metacarpophalangeal
+        mf_dip: Optional[float] = None,  # middle finger coupled distal joints
+        rf_mcp: Optional[float] = None,  # ring finger metacarpophalangeal
+        rf_dip: Optional[float] = None,  # ring finger coupled distal joints
+        lf_mcp: Optional[float] = None,  # little finger metacarpophalangeal
+        lf_dip: Optional[float] = None,  # little finger coupled distal joints
+        speeds: Union[int, List[int]] = 15000,  # Speed for each motor (0-32767)
+        currents: Union[int, List[int]] = 20,   # Current for each motor (10-599mA)
+        clear_error: bool = False,
+        request_feedback: bool = True,
+        log_level: Optional[LogLevel] = None
+    ) -> bool:
+        """Move all joints with a single broadcast command.
+        
+        Args:
+            control_mode: Motor control mode
+            th_rot, th_mcp, th_dip, etc.: Joint angles in degrees
+            speeds: Either a single speed value for all motors or a list of 12 speed values
+            currents: Either a single current value for all motors or a list of 12 current values
+            clear_error: Whether to clear errors
+            request_feedback: Whether to request feedback
+            log_level: Logging level for this operation
+            
+        Returns:
+            bool: True if command sent successfully
+        """
+        # Map joint angles to motor commands
+        motor_angles = [
+            th_dip, th_mcp,     # Thumb
+            th_rot, ff_spr,     # Rotation & spread
+            ff_dip, ff_mcp,     # First finger
+            mf_dip, mf_mcp,     # Middle finger
+            rf_dip, rf_mcp,     # Ring finger
+            lf_dip, lf_mcp      # Little finger
+        ]
+        
+        # Create enable_motors list based on which angles are provided
+        enable_motors = [angle is not None for angle in motor_angles]
+        
+        # Scale angles for the specified control mode
+        positions = []
+        for i, angle in enumerate(motor_angles):
+            if angle is not None:
+                positions.append(int(self._scale_angle(i, angle, control_mode)))
+            else:
+                positions.append(0)
+        
+        # Handle speed parameter
+        if isinstance(speeds, int):
+            speeds = [speeds] * 12
+        elif len(speeds) != 12:
+            logger.error(f"If speeds is a list, it must contain exactly 12 values")
+            return False
+            
+        # Handle current parameter
+        if isinstance(currents, int):
+            currents = [currents] * 12
+        elif len(currents) != 12:
+            logger.error(f"If currents is a list, it must contain exactly 12 values")
+            return False
+        
+        # Use right hand if this is a RightDexHand instance
+        is_right_hand = isinstance(self, RightDexHand)
+        
+        # Send the broadcast command
+        return self.send_broadcast_control_frame(
+            control_mode=control_mode,
+            enable_motors=enable_motors,
+            positions=positions,
+            speeds=speeds,
+            currents=currents,
+            clear_error=clear_error,
+            request_feedback=request_feedback,
+            is_right_hand=is_right_hand,
+            log_level=log_level
+        )
 
 
     def get_feedback(self) -> HandFeedback:
@@ -733,6 +970,19 @@ class DexHandBase:
         for board_idx in range(self.NUM_BOARDS):
             if clear_all or not self.board_states[board_idx].is_normal:
                 self._clear_board_error(board_idx)
+    
+    def clear_all_errors(self, log_level: Optional[LogLevel] = None) -> bool:
+        """Clear all errors for the hand(more faster than clear_errors)
+        
+        Args:
+            log_level: default for LogLevel.INFO:0,All control commands, parameter read and write commands, all feedback information, error messages;
+                        LogLevel.DEBUG:1,All parameter setting commands, parameter setting feedback information, all error messages;
+                        LogLevel.ERROR:2,All error messages;
+            
+        Returns:
+            bool: True if command sent successfully
+        """
+        return self.send_global_command(GlobalFunctionCode.CLEAR_ERROR, log_level=log_level)
 
     def _scale_angle(
         self, motor_idx: int, angle: float, control_mode: ControlMode
@@ -771,7 +1021,7 @@ class DexHandBase:
             rf_dip=0,
             lf_mcp=0,
             lf_dip=0,
-            control_mode=ControlMode.IMPEDANCE_GRASP,
+            control_mode=ControlMode.CASCADED_PID,
             log_level=log_level
         )
         if log_level is not None and log_level <= LogLevel.INFO:

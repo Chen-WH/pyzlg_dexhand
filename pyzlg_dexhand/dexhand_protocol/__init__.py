@@ -16,6 +16,7 @@ class MessageType(IntEnum):
     MOTION_FEEDBACK = 0x180    # Hand -> Host: Motion state
     CONFIG_RESPONSE = 0x80     # Hand -> Host: Config response
     ERROR_MESSAGE = 0x600      # Hand -> Host: Errors
+    GLOBAL_COMMAND = 0xFF      # Host -> Hand: Global command
     INVALID = 0x1000          # Special: Message decoding failed
     UNKNOWN = 0x1001          # Special: Unknown message type
 
