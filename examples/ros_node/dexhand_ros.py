@@ -11,7 +11,7 @@ import time
 import yaml
 import os.path
 
-from pyzlg_dexhand.pyzlg_dexhand.dexhand_interface import (
+from pyzlg_dexhand.dexhand_interface import (
     DexHandBase,
     LeftDexHand,
     RightDexHand,
@@ -308,13 +308,26 @@ class DexHandNode(ROSNode):
             # Process tactile feedback
             if feedback.tactile:
                 touch_msg = Float32MultiArray()
-                touch_msg.data = [0.0] * 5  # Default to 0 for all fingertips
+                touch_msg.data = [0.0] * 70  # Default to 0 for all fingertips, 5 fingers * 14 sensor data
 
                 # Map feedback to correct indices (thumb, index, middle, ring, pinky)
                 for finger_name, tactile_data in feedback.tactile.items():
                     if finger_name in self.fingertip_mapping:
                         idx = self.fingertip_mapping[finger_name]
-                        touch_msg.data[idx] = tactile_data.normal_force
+                        touch_msg.data[14*idx] = tactile_data.timestamp
+                        touch_msg.data[14*idx+1] = tactile_data.normal_force
+                        touch_msg.data[14*idx+2] = tactile_data.normal_force_delta
+                        touch_msg.data[14*idx+3] = tactile_data.tangential_force
+                        touch_msg.data[14*idx+4] = tactile_data.tangential_force_delta
+                        touch_msg.data[14*idx+5] = tactile_data.direction
+                        touch_msg.data[14*idx+6] = tactile_data.proximity
+                        touch_msg.data[14*idx+7] = tactile_data.temperature
+                        touch_msg.data[14*idx+8] = tactile_data.encoder1
+                        touch_msg.data[14*idx+9] = tactile_data.encoder2
+                        touch_msg.data[14*idx+10] = tactile_data.motor1_error
+                        touch_msg.data[14*idx+11] = tactile_data.motor2_error
+                        touch_msg.data[14*idx+12] = tactile_data.impedance1
+                        touch_msg.data[14*idx+13] = tactile_data.impedance2
 
                 # Publish tactile data
                 self.touch_sensor_pub.publish(touch_msg)
