@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from ros_compat import ROSNode
 from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float64MultiArray
 from std_srvs.srv import Trigger
 from sensor_msgs.msg import JointState
 import argparse
@@ -193,10 +194,10 @@ class DexHandNode(ROSNode):
                 JointState, self.right_hand_joint_feedback_topic, 10
             )
             self.left_touch_sensor_pub = self.create_publisher(
-                Float32MultiArray, self.left_touch_feedback_topic, 10
+                Float64MultiArray, self.left_touch_feedback_topic, 10
             )
             self.right_touch_sensor_pub = self.create_publisher(
-                Float32MultiArray, self.right_touch_feedback_topic, 10
+                Float64MultiArray, self.right_touch_feedback_topic, 10
             )
 
 
@@ -219,7 +220,11 @@ class DexHandNode(ROSNode):
             # Create dictionary of joint values
             joint_values = {}
             for name, pos in zip(msg.name, msg.position):
-                joint_values[name] = pos
+                if pos != pos:  
+                    # self.logger.warning(f"NaN detected in joint {name}, setting to 0")
+                    joint_values[name] = 0.0
+                else:
+                    joint_values[name] = pos
 
             # Process command for each hand
             for hand, mapping in self.joint_mappings.items():
@@ -249,7 +254,12 @@ class DexHandNode(ROSNode):
             # Create dictionary of joint values
             joint_values = {}
             for name, pos in zip(msg.name, msg.position):
-                joint_values[name] = pos
+                if pos != pos:  
+                    # self.logger.warning(f"NaN detected in joint {name}, setting to 0")
+                    joint_values[name] = 0.0
+                else:
+                    joint_values[name] = pos
+                
 
             # Process command for each hand
             for hand, mapping in self.joint_mappings.items():
@@ -344,31 +354,39 @@ class DexHandNode(ROSNode):
                 left_hand_joint_state_msg.name = self.joint_mappings[hand].joint_names
                 left_hand_joint_state_msg.position = [left_pos_dict_urdf.get(joint, 0.0) for joint in left_hand_joint_state_msg.name]
                 left_hand_joint_state_msg.velocity = [left_vel_dict_urdf.get(joint, 0.0) for joint in left_hand_joint_state_msg.name]
+                
                 self.left_hand_joint_state_pub.publish(left_hand_joint_state_msg)
 
                 # Process tactile feedback
                 if feedback_left.tactile:
-                    left_touch_msg = Float32MultiArray()
-                    left_touch_msg.data = [0.0] * 70  # Default to 0 for all fingertips, 5 fingers * 14 sensor data
+                    left_touch_msg = Float64MultiArray()
+                    left_touch_msg.data = [0.0] * 75  # Default to 0 for all fingertips, 5 fingers * 14 sensor data
 
                     # Map feedback to correct indices (thumb, index, middle, ring, pinky)
                     for finger_name, tactile_data in feedback_left.tactile.items():
                         if finger_name in self.fingertip_mapping:
                             idx = self.fingertip_mapping[finger_name]
-                            left_touch_msg.data[14*idx] = tactile_data.timestamp
-                            left_touch_msg.data[14*idx+1] = tactile_data.normal_force
-                            left_touch_msg.data[14*idx+2] = tactile_data.normal_force_delta
-                            left_touch_msg.data[14*idx+3] = tactile_data.tangential_force
-                            left_touch_msg.data[14*idx+4] = tactile_data.tangential_force_delta
-                            left_touch_msg.data[14*idx+5] = tactile_data.direction
-                            left_touch_msg.data[14*idx+6] = tactile_data.proximity
-                            left_touch_msg.data[14*idx+7] = tactile_data.temperature
-                            left_touch_msg.data[14*idx+8] = tactile_data.encoder1
-                            left_touch_msg.data[14*idx+9] = tactile_data.encoder2
-                            left_touch_msg.data[14*idx+10] = tactile_data.motor1_error
-                            left_touch_msg.data[14*idx+11] = tactile_data.motor2_error
-                            left_touch_msg.data[14*idx+12] = tactile_data.impedance1
-                            left_touch_msg.data[14*idx+13] = tactile_data.impedance2
+                            left_touch_msg.data[15*idx] = tactile_data.timestamp // 1000000000
+                            left_touch_msg.data[15*idx+1] = tactile_data.timestamp % 1000000000
+
+                            # left_touch_msg.data[14*idx] = (tactile_data.timestamp // 1000000000) % 1000000
+                            # left_touch_msg.data[14*idx+1] = (tactile_data.timestamp % 1000000000) // 1000
+                            
+                            # left_touch_msg.data[14*idx] = float(self.get_clock().now().sec)
+                            # left_touch_msg.data[14*idx+1] = float(self.get_clock().now().nanosec)
+                            left_touch_msg.data[15*idx+2] = tactile_data.normal_force
+                            left_touch_msg.data[15*idx+3] = tactile_data.normal_force_delta
+                            left_touch_msg.data[15*idx+4] = tactile_data.tangential_force
+                            left_touch_msg.data[15*idx+5] = tactile_data.tangential_force_delta
+                            left_touch_msg.data[15*idx+6] = tactile_data.direction
+                            left_touch_msg.data[15*idx+7] = tactile_data.proximity
+                            left_touch_msg.data[15*idx+8] = tactile_data.temperature
+                            left_touch_msg.data[15*idx+9] = tactile_data.encoder1
+                            left_touch_msg.data[15*idx+10] = tactile_data.encoder2
+                            left_touch_msg.data[15*idx+11] = tactile_data.motor1_error
+                            left_touch_msg.data[15*idx+12] = tactile_data.motor2_error
+                            left_touch_msg.data[15*idx+13] = tactile_data.impedance1
+                            left_touch_msg.data[15*idx+14] = tactile_data.impedance2
 
                     # Publish tactile data
                     self.left_touch_sensor_pub.publish(left_touch_msg)
@@ -410,27 +428,33 @@ class DexHandNode(ROSNode):
 
                 # Process tactile feedback
                 if feedback_right.tactile:
-                    right_touch_msg = Float32MultiArray()
-                    right_touch_msg.data = [0.0] * 70  # Default to 0 for all fingertips, 5 fingers * 14 sensor data
+                    right_touch_msg = Float64MultiArray()
+                    right_touch_msg.data = [0.0] * 75  # Default to 0 for all fingertips, 5 fingers * 14 sensor data
 
                     # Map feedback to correct indices (thumb, index, middle, ring, pinky)
                     for finger_name, tactile_data in feedback_right.tactile.items():
                         if finger_name in self.fingertip_mapping:
                             idx = self.fingertip_mapping[finger_name]
-                            right_touch_msg.data[14*idx] = tactile_data.timestamp
-                            right_touch_msg.data[14*idx+1] = tactile_data.normal_force
-                            right_touch_msg.data[14*idx+2] = tactile_data.normal_force_delta
-                            right_touch_msg.data[14*idx+3] = tactile_data.tangential_force
-                            right_touch_msg.data[14*idx+4] = tactile_data.tangential_force_delta
-                            right_touch_msg.data[14*idx+5] = tactile_data.direction
-                            right_touch_msg.data[14*idx+6] = tactile_data.proximity
-                            right_touch_msg.data[14*idx+7] = tactile_data.temperature
-                            right_touch_msg.data[14*idx+8] = tactile_data.encoder1
-                            right_touch_msg.data[14*idx+9] = tactile_data.encoder2
-                            right_touch_msg.data[14*idx+10] = tactile_data.motor1_error
-                            right_touch_msg.data[14*idx+11] = tactile_data.motor2_error
-                            right_touch_msg.data[14*idx+12] = tactile_data.impedance1
-                            right_touch_msg.data[14*idx+13] = tactile_data.impedance2
+                            right_touch_msg.data[15*idx] = tactile_data.timestamp // 1000000000
+                            right_touch_msg.data[15*idx+1] = tactile_data.timestamp % 1000000000
+                            # right_touch_msg.data[14*idx] = (tactile_data.timestamp // 1000000000) % 1000000
+                            # right_touch_msg.data[14*idx+1] = (tactile_data.timestamp % 1000000000) // 1000
+                            # right_touch_msg.data[14*idx] = float(self.get_clock().now().sec)
+                            # right_touch_msg.data[14*idx+1] = float(self.get_clock().now().nanosec)
+                            
+                            right_touch_msg.data[15*idx+2] = tactile_data.normal_force
+                            right_touch_msg.data[15*idx+3] = tactile_data.normal_force_delta
+                            right_touch_msg.data[15*idx+4] = tactile_data.tangential_force
+                            right_touch_msg.data[15*idx+5] = tactile_data.tangential_force_delta
+                            right_touch_msg.data[15*idx+6] = tactile_data.direction
+                            right_touch_msg.data[15*idx+7] = tactile_data.proximity
+                            right_touch_msg.data[15*idx+8] = tactile_data.temperature
+                            right_touch_msg.data[15*idx+9] = tactile_data.encoder1
+                            right_touch_msg.data[15*idx+10] = tactile_data.encoder2
+                            right_touch_msg.data[15*idx+11] = tactile_data.motor1_error
+                            right_touch_msg.data[15*idx+12] = tactile_data.motor2_error
+                            right_touch_msg.data[15*idx+13] = tactile_data.impedance1
+                            right_touch_msg.data[15*idx+14] = tactile_data.impedance2
 
                     # Publish tactile data
                     self.right_touch_sensor_pub.publish(right_touch_msg)

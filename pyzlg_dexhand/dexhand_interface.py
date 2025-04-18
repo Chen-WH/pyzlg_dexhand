@@ -675,7 +675,7 @@ class DexHandBase:
             HandFeedback object.
         """
         # Record query start time
-        query_timestamp = time.time()
+        query_timestamp = time.time_ns() / 1e9
 
         # Refresh board states to get feedback
         self._refresh_board_states()
@@ -685,14 +685,14 @@ class DexHandBase:
         tactile_feedback = {}
         for board_idx, state in self.board_states.items():
             base_idx = board_idx * 2
-            timestamp = time.time()
+            timestamp_feedback = time.time_ns()
 
             if state.feedback is None:
                 # No feedback available
                 for i in range(2):
                     joint_idx = base_idx + i
                     joint_feedback[self.joint_names[joint_idx]] = JointFeedback(
-                        timestamp=timestamp,
+                        timestamp=timestamp_feedback,
                         angle=float("nan"),
                         encoder_position=None,
                     )
@@ -703,7 +703,7 @@ class DexHandBase:
             for i in range(2):
                 joint_idx = base_idx + i
                 joint_feedback[self.joint_names[joint_idx]] = JointFeedback(
-                    timestamp=timestamp,
+                    timestamp=timestamp_feedback,
                     angle=motors[i].angle,
                     encoder_position=motors[i].position,
                 )
@@ -713,7 +713,7 @@ class DexHandBase:
                 if board_idx in self.finger_map:
                     tactile_feedback[self.finger_map[board_idx]] = (
                         StampedTactileFeedback(
-                            timestamp=timestamp, **asdict(state.feedback.tactile)
+                            timestamp=timestamp_feedback, **asdict(state.feedback.tactile)
                         )
                     )
 

@@ -14,7 +14,7 @@ DexHand:
     
     # Control parameters
     rate: 150.0  # Command sending rate in Hz
-    mode: 'protect_hall_position'  # Control mode: zero_torque, current, speed, hall_position, cascaded_pid, protect_hall_position
+    mode: 'cascaded_pid'  # Control mode: zero_torque, current, speed, hall_position, cascaded_pid, protect_hall_position
     alpha: 0.2  # Low-pass filter intensity (0-1)
 
     # Topic configuration
