@@ -182,6 +182,168 @@ class DexHandBase:
             return False
 
         return True
+        
+    def read_flash_memory(self, board_idx: int, address: int, timeout: float = 0.1) -> Optional[bytes]:
+        """Read raw data from flash memory
+        
+        Args:
+            board_idx: Board index (0-5)
+            address: Memory address to read from
+            timeout: Timeout in seconds
+            
+        Returns:
+            Raw bytes read from memory, or None if read failed
+        """
+        if not 0 <= board_idx < self.NUM_BOARDS:
+            raise ValueError(f"Invalid board index: {board_idx}")
+            
+        if not 0 <= address <= 0xFF:
+            raise ValueError(f"Invalid memory address: {address}")
+            
+        # Create read command 
+        board_id = self.base_id + board_idx
+        can_id = board_id
+        data = bytes([0x01, address])  # Command 0x01 (read), address
+        
+        # Send command and wait for response
+        response_id = 0x80 + board_id  # Response ID is base + 0x80
+        self.zcan.send_message(can_id, data)
+        
+        # Wait for response
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            messages = self.zcan.receive_messages()
+            for msg_id, msg_data in messages:
+                if msg_id != response_id:
+                    continue
+                    
+                # Check if this is a valid response for our address
+                if len(msg_data) >= 4 and msg_data[0] == 0x01 and msg_data[1] == address:
+                    # Return the raw data (first two bytes are command and address)
+                    return msg_data[2:]
+                    
+            time.sleep(0.001)
+            
+        logger.error(f"Failed to read from board {board_idx} address 0x{address:02x}")
+        return None
+        
+    def write_flash_memory(self, board_idx: int, address: int, value: bytes, timeout: float = 0.1) -> bool:
+        """Write data to flash memory
+        
+        Args:
+            board_idx: Board index (0-5)
+            address: Memory address to write to
+            value: Data to write (up to 6 bytes)
+            timeout: Timeout in seconds
+            
+        Returns:
+            True if write succeeded, False otherwise
+        """
+        if not 0 <= board_idx < self.NUM_BOARDS:
+            raise ValueError(f"Invalid board index: {board_idx}")
+            
+        if not 0 <= address <= 0xFF:
+            raise ValueError(f"Invalid memory address: {address}")
+            
+        if len(value) > 6:
+            raise ValueError(f"Data too large: maximum 6 bytes, got {len(value)}")
+            
+        # Create write command
+        board_id = self.base_id + board_idx
+        can_id = board_id
+        
+        # Command structure: [0x02 (write command), address, data...]
+        data = bytearray([0x02, address]) + value
+        # Pad to 8 bytes total for CAN message
+        data.extend([0] * (8 - len(data)))
+        
+        # Send command and wait for response
+        response_id = 0x80 + board_id
+        self.zcan.send_message(can_id, bytes(data))
+        
+        # Wait for response
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            messages = self.zcan.receive_messages()
+            for msg_id, msg_data in messages:
+                if msg_id != response_id:
+                    continue
+                    
+                # Check if this is a valid response
+                if len(msg_data) >= 5 and msg_data[0] == 0x02 and msg_data[1] == address:
+                    # Check for success indicator at byte 4
+                    success = msg_data[4] == 0x01
+                    if not success:
+                        logger.error(f"Write to board {board_idx} address 0x{address:02x} failed")
+                    return success
+                    
+            time.sleep(0.001)
+            
+        logger.error(f"No response to write to board {board_idx} address 0x{address:02x}")
+        return False
+        
+    def get_board_firmware_version(self, board_idx: int = 0) -> Optional[int]:
+        """Get the firmware version from a specific board
+        
+        Reads the firmware version value from memory address 0x02 of the specified board.
+        
+        Args:
+            board_idx: Board index (0-5)
+            
+        Returns:
+            Firmware version number, or None if read failed
+        """
+        data = self.read_flash_memory(board_idx, FlashStorageTable.MEMORY_ADDRESS_FIRMWARE_VERSION)
+        if not data or len(data) < 2:
+            return None
+            
+        # Extract firmware version (little-endian)
+        return int.from_bytes(data[:2], 'little')
+        
+    def save_to_flash(self, board_idx: int) -> bool:
+        """Save current configuration to flash memory
+        
+        This command persists any configuration changes to flash memory so they
+        will survive power cycles. Without this, configuration changes are temporary.
+        
+        Args:
+            board_idx: Board index (0-5)
+            
+        Returns:
+            True if save succeeded, False otherwise
+        """
+        # The save-to-flash command is a write to address 0x04 with no data
+        return self.write_flash_memory(board_idx, FlashStorageTable.MEMORY_ADDRESS_SAVE_TO_FLASH, b'')
+        
+    def get_firmware_versions(self) -> Dict[str, Optional[int]]:
+        """Get firmware versions from all boards
+        
+        Returns a dictionary mapping joint names to their firmware versions.
+        Boards controlling multiple joints (like the thumb board) will have the same
+        firmware version reported for all joints controlled by that board.
+        
+        Returns:
+            Dictionary mapping joint names to firmware versions, or None if read failed
+        """
+        # Map from board index to joint names
+        board_to_joints = {
+            0: ["th_dip", "th_mcp"],           # Thumb board
+            1: ["th_rot", "ff_spr"],           # Thumb rotation & spread board
+            2: ["ff_dip", "ff_mcp"],           # First finger board  
+            3: ["mf_dip", "mf_mcp"],           # Middle finger board
+            4: ["rf_dip", "rf_mcp"],           # Ring finger board
+            5: ["lf_dip", "lf_mcp"],           # Little finger board
+        }
+        
+        versions = {}
+        
+        # For each board, fetch its firmware version and assign to all joints on that board
+        for board_idx in range(self.NUM_BOARDS):
+            version = self.get_board_firmware_version(board_idx)
+            for joint_name in board_to_joints.get(board_idx, []):
+                versions[joint_name] = version
+                
+        return versions
 
     def _get_command_id(self, msg_type: MessageType, board_idx: int) -> int:
         """Get command CAN ID for a board index"""
