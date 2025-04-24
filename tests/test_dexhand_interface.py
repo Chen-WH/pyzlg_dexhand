@@ -29,14 +29,18 @@ from pyzlg_dexhand.dexhand_logger import DexHandLogger
 def create_mock_feedback(timestamp=1000.0):
     """Create mock feedback data for testing"""
     return BoardFeedback(
-        motor1=MotorFeedback(100, 200, 1000, 45.0, 
-                             encoder_value=2048, 
-                             error_code=0, 
-                             impedance=100.0),
-        motor2=MotorFeedback(-150, -250, -2000, -90.0, 
-                             encoder_value=1024, 
-                             error_code=0, 
-                             impedance=200.0),
+        motor1=MotorFeedback(
+            current=100, 
+            velocity=200, 
+            position=1000, 
+            angle=45.0
+        ),
+        motor2=MotorFeedback(
+            current=-150, 
+            velocity=-250, 
+            position=-2000, 
+            angle=-90.0
+        ),
         position_sensor1=45.0,
         position_sensor2=-90.0,
         tactile=TactileFeedback(
@@ -46,7 +50,13 @@ def create_mock_feedback(timestamp=1000.0):
             tangential_force_delta=50,
             direction=180,
             proximity=500,
-            temperature=25
+            temperature=25,
+            encoder1=2048,
+            encoder2=1024,
+            motor1_error=0,
+            motor2_error=0,
+            impedance1=1.0,
+            impedance2=1.0
         )
     )
 
