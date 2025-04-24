@@ -187,7 +187,7 @@ class DexHandBase:
                 is_normal=True,
                 error_info=None,
             )
-            for i in range(self.NUM_BOARDS)
+            for i in range(NUM_BOARDS)
         }
         
         # Automatically initialize if requested
@@ -198,10 +198,10 @@ class DexHandBase:
     def _init_hall_scaling(self):
         """Initialize scaling factors for hall position modes"""
         # Conversion factor for hall position modes (from protocol spec)
-        factor = (self.HARDWARE_COUNTS_PER_REV * 
-                  self.GEAR_RATIO * 
-                  self.RESOLUTION_FACTOR / 
-                  self.DEG_PER_REV)  # Converts degrees to hardware units
+        factor = (HARDWARE_COUNTS_PER_REV * 
+                  GEAR_RATIO * 
+                  RESOLUTION_FACTOR / 
+                  DEG_PER_REV)  # Converts degrees to hardware units
         self._hall_scale = np.array(self.config.hall_scale) * factor
 
     def init(self, device_index: int = 0) -> bool:
@@ -244,7 +244,7 @@ class DexHandBase:
         Returns:
             Raw bytes read from memory, or None if read failed
         """
-        if not 0 <= board_idx < self.NUM_BOARDS:
+        if not 0 <= board_idx < NUM_BOARDS:
             raise ValueError(f"Invalid board index: {board_idx}")
             
         if not 0 <= address <= 0xFF:
@@ -289,7 +289,7 @@ class DexHandBase:
         Returns:
             True if write succeeded, False otherwise
         """
-        if not 0 <= board_idx < self.NUM_BOARDS:
+        if not 0 <= board_idx < NUM_BOARDS:
             raise ValueError(f"Invalid board index: {board_idx}")
             
         if not 0 <= address <= 0xFF:
@@ -388,7 +388,7 @@ class DexHandBase:
         versions = {}
         
         # For each board, fetch its firmware version and assign to all joints on that board
-        for board_idx in range(self.NUM_BOARDS):
+        for board_idx in range(NUM_BOARDS):
             version = self.get_board_firmware_version(board_idx)
             for joint_name in board_to_joints.get(board_idx, []):
                 versions[joint_name] = version
@@ -397,7 +397,7 @@ class DexHandBase:
 
     def _get_command_id(self, msg_type: MessageType, board_idx: int) -> int:
         """Get command CAN ID for a board index"""
-        if not 0 <= board_idx < self.NUM_BOARDS:
+        if not 0 <= board_idx < NUM_BOARDS:
             raise ValueError(f"Invalid board index: {board_idx}")
         return msg_type + self.base_id + board_idx
 
@@ -424,7 +424,7 @@ class DexHandBase:
             return False
 
         # Send command to all boards
-        for board_idx in range(self.NUM_BOARDS):
+        for board_idx in range(NUM_BOARDS):
             command_id = self._get_command_id(msg_type, board_idx)
             if not self.zcan.send_fd_message(self.config.channel, command_id, data):
                 logger.error(
@@ -663,7 +663,7 @@ class DexHandBase:
             self._log_at_level(f"Sending command: {command.hex()}", LogLevel.DEBUG, log_level)
             
             # Send commands to all boards
-            for board_idx in range(self.NUM_BOARDS):
+            for board_idx in range(NUM_BOARDS):
                 command_id = self._get_command_id(MessageType.CONFIG_COMMAND, board_idx)
                 if not self.zcan.send_fd_message(self.config.channel, command_id, command):
                     logger.error(f"Failed to send command to board {board_idx}")
@@ -765,15 +765,15 @@ class DexHandBase:
         """
         # Default to all motors enabled if not specified
         if enable_motors is None:
-            enable_motors = [True] * self.NUM_MOTORS
+            enable_motors = [True] * NUM_MOTORS
         
         # Default values for positions, speeds, currents
         if positions is None:
-            positions = [0] * self.NUM_MOTORS
+            positions = [0] * NUM_MOTORS
         if speeds is None:
-            speeds = [self.DEFAULT_MOTOR_SPEED] * self.NUM_MOTORS
+            speeds = [DEFAULT_MOTOR_SPEED] * NUM_MOTORS
         if currents is None:
-            currents = [self.DEFAULT_MOTOR_CURRENT] * self.NUM_MOTORS
+            currents = [DEFAULT_MOTOR_CURRENT] * NUM_MOTORS
         
         # Create broadcast command
         command = BroadcastCommand(
@@ -795,7 +795,7 @@ class DexHandBase:
                              LogLevel.DEBUG, log_level)
             
             # Send the frame with the broadcast ID
-            if not self.zcan.send_fd_message(self.config.channel, self.BROADCAST_FRAME_ID, frame_data):
+            if not self.zcan.send_fd_message(self.config.channel, BROADCAST_FRAME_ID, frame_data):
                 logger.error("Failed to send broadcast control frame")
                 return False
             
@@ -1282,7 +1282,7 @@ class DexHandBase:
         
         # Fall back to individual commands for selective clearing
         success = True
-        for board_idx in range(self.NUM_BOARDS):
+        for board_idx in range(NUM_BOARDS):
             if clear_all or not self.board_states[board_idx].is_normal:
                 if not self._clear_board_error(board_idx):
                     success = False
@@ -1328,7 +1328,7 @@ class DexHandBase:
             return int(angle * self._hall_scale[motor_idx])
         else:
             # For other modes (e.g., cascaded PID), use standard scaling
-            return int(angle * self.CASCADE_PID_SCALE)
+            return int(angle * CASCADE_PID_SCALE)
 
     def reset_joints(self, use_broadcast: bool = True, log_level: Optional[LogLevel] = None):
         """Reset all joints to their zero positions.
