@@ -675,7 +675,7 @@ class DexHandBase:
                 elif result.msg_type == MessageType.ERROR_MESSAGE:
                     self.board_states[board_idx].status_timestamp = timestamp
                     self.board_states[board_idx].is_normal = False
-                    self.board_states[board_idx].error_info = result.error
+                    self.board_states[board_idx].error_info = result.error_info
                 elif result.msg_type == MessageType.CONFIG_RESPONSE:
                     success, command_type = protocol.messages.verify_config_response(
                         msg_id, data
