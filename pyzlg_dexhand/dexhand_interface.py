@@ -884,12 +884,13 @@ class DexHandBase:
         rf_dip: Optional[float] = None,  # ring finger coupled distal joints
         lf_mcp: Optional[float] = None,  # little finger metacarpophalangeal
         lf_dip: Optional[float] = None,  # little finger coupled distal joints
-        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,# Control mode
-        motor1_speed: Optional[int] = 15000,  # Motor 1 speed
-        motor2_speed: Optional[int] = 15000,  # Motor 2 speed
-        motor1_current: Optional[int] = 20,  # Motor 1 current
-        motor2_current: Optional[int] = 20,  # Motor 2 current
-        log_level: Optional[LogLevel] = LogLevel.ERROR, # log level
+        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,  # Control mode
+        speeds: Union[int, List[int]] = 15000,  # Speed for all motors or list of speeds
+        currents: Union[int, List[int]] = 20,  # Current for all motors or list of currents
+        use_broadcast: bool = False,  # Whether to use broadcast command (more efficient)
+        clear_error: bool = False,  # Whether to clear errors (only for broadcast mode)
+        request_feedback: bool = True,  # Whether to request feedback (only for broadcast mode)
+        log_level: Optional[LogLevel] = None,  # Log level
     ):
         """Move hand joints to specified angles.
 
@@ -915,11 +916,12 @@ class DexHandBase:
             lf_mcp: Little MCP flexion
             lf_dip: Little coupled PIP-DIP flexion
             control_mode: Motor control mode
-            motor1_speed: Motor 1 speed (0-32767)
-            motor2_speed: Motor 2 speed (0-32767)
-            motor1_current: Motor 1 current (10-599mA)
-            motor2_current: Motor 2 current (10-599mA)
-            log_level: Log level for logging
+            speeds: Either a single speed value for all motors (0-32767) or a list of 12 speed values
+            currents: Either a single current value for all motors (10-599mA) or a list of 12 current values
+            use_broadcast: If True, send a single broadcast command for all joints (more efficient)
+            clear_error: Whether to clear errors (only for broadcast mode)
+            request_feedback: Whether to request feedback (only for broadcast mode)
+            log_level: Logging level for this operation
         """
         # Record command start time
         command_timestamp = time.time()
@@ -940,125 +942,82 @@ class DexHandBase:
             lf_mcp,  # Board 5
         ]
 
-        # Scale angles and create enable mask
-        scaled_positions = np.zeros(self.NUM_MOTORS)
-        enables = [False] * self.NUM_MOTORS
-
-        for i, (angle, name) in enumerate(zip(motor_angles, self.joint_names)):
-            if angle is not None:
-                scaled_positions[i] = self._scale_angle(i, angle, control_mode)
-                enables[i] = True
-
-        for board_idx in range(self.NUM_BOARDS):
-            base_idx = board_idx * 2
-            if any(enables[base_idx : base_idx + 2]):
-                motor_enable = 0x01 if enables[base_idx] else 0
-                motor_enable |= 0x02 if enables[base_idx + 1] else 0
-                success = self._send_motion_command(
-                    board_idx=board_idx,
-                    motor1_pos=int(scaled_positions[base_idx]),
-                    motor2_pos=int(scaled_positions[base_idx + 1]),
-                    motor_enable=motor_enable,
-                    control_mode=control_mode,
-                    motor1_speed=motor1_speed,
-                    motor2_speed=motor2_speed,
-                    motor1_current=motor1_current,
-                    motor2_current=motor2_current,
-                )
-                if not success:
-                    logger.error(f"Failed to send command to board {board_idx}")
-        if log_level is not None and log_level <= LogLevel.INFO:
-            logger.info(f"successfully for move joints command")
-        elif self.log_level <= LogLevel.INFO:
-            logger.info(f"successfully for move joints command")
-
-    def broadcast_move_joints(
-        self,
-        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
-        th_rot: Optional[float] = None,  # thumb rotation
-        th_mcp: Optional[float] = None,  # thumb metacarpophalangeal
-        th_dip: Optional[float] = None,  # thumb coupled distal joints
-        ff_spr: Optional[float] = None,  # four-finger spread
-        ff_mcp: Optional[float] = None,  # first finger metacarpophalangeal
-        ff_dip: Optional[float] = None,  # first finger coupled distal joints
-        mf_mcp: Optional[float] = None,  # middle finger metacarpophalangeal
-        mf_dip: Optional[float] = None,  # middle finger coupled distal joints
-        rf_mcp: Optional[float] = None,  # ring finger metacarpophalangeal
-        rf_dip: Optional[float] = None,  # ring finger coupled distal joints
-        lf_mcp: Optional[float] = None,  # little finger metacarpophalangeal
-        lf_dip: Optional[float] = None,  # little finger coupled distal joints
-        speeds: Union[int, List[int]] = 15000,  # Speed for each motor (0-32767)
-        currents: Union[int, List[int]] = 20,   # Current for each motor (10-599mA)
-        clear_error: bool = False,
-        request_feedback: bool = True,
-        log_level: Optional[LogLevel] = None
-    ) -> bool:
-        """Move all joints with a single broadcast command.
-        
-        Args:
-            control_mode: Motor control mode
-            th_rot, th_mcp, th_dip, etc.: Joint angles in degrees
-            speeds: Either a single speed value for all motors or a list of 12 speed values
-            currents: Either a single current value for all motors or a list of 12 current values
-            clear_error: Whether to clear errors
-            request_feedback: Whether to request feedback
-            log_level: Logging level for this operation
-            
-        Returns:
-            bool: True if command sent successfully
-        """
-        # Map joint angles to motor commands
-        motor_angles = [
-            th_dip, th_mcp,     # Thumb
-            th_rot, ff_spr,     # Rotation & spread
-            ff_dip, ff_mcp,     # First finger
-            mf_dip, mf_mcp,     # Middle finger
-            rf_dip, rf_mcp,     # Ring finger
-            lf_dip, lf_mcp      # Little finger
-        ]
-        
         # Create enable_motors list based on which angles are provided
         enable_motors = [angle is not None for angle in motor_angles]
         
         # Scale angles for the specified control mode
-        positions = []
+        scaled_positions = []
         for i, angle in enumerate(motor_angles):
             if angle is not None:
-                positions.append(int(self._scale_angle(i, angle, control_mode)))
+                scaled_positions.append(int(self._scale_angle(i, angle, control_mode)))
             else:
-                positions.append(0)
+                scaled_positions.append(0)
         
         # Handle speed parameter
         if isinstance(speeds, int):
-            speeds = [speeds] * 12
-        elif len(speeds) != 12:
+            motor_speeds = [speeds] * 12
+        elif len(speeds) == 12:
+            motor_speeds = speeds
+        else:
             logger.error(f"If speeds is a list, it must contain exactly 12 values")
             return False
             
         # Handle current parameter
         if isinstance(currents, int):
-            currents = [currents] * 12
-        elif len(currents) != 12:
+            motor_currents = [currents] * 12
+        elif len(currents) == 12:
+            motor_currents = currents
+        else:
             logger.error(f"If currents is a list, it must contain exactly 12 values")
             return False
         
-        # Use right hand if this is a RightDexHand instance
-        is_right_hand = isinstance(self, RightDexHand)
-        
-        # Send the broadcast command
-        return self.send_broadcast_control_frame(
-            control_mode=control_mode,
-            enable_motors=enable_motors,
-            positions=positions,
-            speeds=speeds,
-            currents=currents,
-            clear_error=clear_error,
-            request_feedback=request_feedback,
-            is_right_hand=is_right_hand,
-            log_level=log_level
-        )
-
-
+        # Use broadcast mode if requested (more efficient)
+        if use_broadcast:
+            # Use right hand if this is a RightDexHand instance
+            is_right_hand = isinstance(self, RightDexHand)
+            
+            # Send the broadcast command
+            return self.send_broadcast_control_frame(
+                control_mode=control_mode,
+                enable_motors=enable_motors,
+                positions=scaled_positions,
+                speeds=motor_speeds,
+                currents=motor_currents,
+                clear_error=clear_error,
+                request_feedback=request_feedback,
+                is_right_hand=is_right_hand,
+                log_level=log_level
+            )
+        else:
+            # Use traditional per-board commands
+            success = True
+            for board_idx in range(self.NUM_BOARDS):
+                base_idx = board_idx * 2
+                if any(enable_motors[base_idx:base_idx + 2]):
+                    motor_enable = 0x01 if enable_motors[base_idx] else 0
+                    motor_enable |= 0x02 if enable_motors[base_idx + 1] else 0
+                    board_success = self._send_motion_command(
+                        board_idx=board_idx,
+                        motor1_pos=scaled_positions[base_idx],
+                        motor2_pos=scaled_positions[base_idx + 1],
+                        motor_enable=motor_enable,
+                        control_mode=control_mode,
+                        motor1_speed=motor_speeds[base_idx],
+                        motor2_speed=motor_speeds[base_idx + 1],
+                        motor1_current=motor_currents[base_idx],
+                        motor2_current=motor_currents[base_idx + 1],
+                    )
+                    if not board_success:
+                        logger.error(f"Failed to send command to board {board_idx}")
+                        success = False
+                        
+            # Log success if requested
+            if success:
+                if (log_level is not None and log_level <= LogLevel.INFO) or self.log_level <= LogLevel.INFO:
+                    logger.info(f"Successfully executed move_joints command")
+                    
+            return success
+            
     def get_feedback(self) -> HandFeedback:
         """Get feedback from all joints and tactile sensors
 
