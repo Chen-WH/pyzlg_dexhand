@@ -203,22 +203,22 @@ class DexHandBase:
         # Create read command 
         board_id = self.base_id + board_idx
         can_id = board_id
-        data = bytes([0x01, address])  # Command 0x01 (read), address
+        data = bytes([MessageType.COMMAND_READ, address])  # Command read, address
         
         # Send command and wait for response
-        response_id = 0x80 + board_id  # Response ID is base + 0x80
-        self.zcan.send_message(can_id, data)
+        response_id = MessageType.CONFIG_RESPONSE + board_id  # Response ID is base + config response base
+        self.zcan.send_fd_message(self.config.channel, can_id, data)
         
         # Wait for response
         start_time = time.time()
         while time.time() - start_time < timeout:
-            messages = self.zcan.receive_messages()
-            for msg_id, msg_data in messages:
+            messages = self.zcan.receive_fd_messages(self.config.channel)
+            for msg_id, msg_data, _ in messages:
                 if msg_id != response_id:
                     continue
                     
                 # Check if this is a valid response for our address
-                if len(msg_data) >= 4 and msg_data[0] == 0x01 and msg_data[1] == address:
+                if len(msg_data) >= 4 and msg_data[0] == MessageType.COMMAND_READ and msg_data[1] == address:
                     # Return the raw data (first two bytes are command and address)
                     return msg_data[2:]
                     
@@ -252,25 +252,25 @@ class DexHandBase:
         board_id = self.base_id + board_idx
         can_id = board_id
         
-        # Command structure: [0x02 (write command), address, data...]
-        data = bytearray([0x02, address]) + value
+        # Command structure: [write command, address, data...]
+        data = bytearray([MessageType.COMMAND_WRITE, address]) + value
         # Pad to 8 bytes total for CAN message
         data.extend([0] * (8 - len(data)))
         
         # Send command and wait for response
-        response_id = 0x80 + board_id
-        self.zcan.send_message(can_id, bytes(data))
+        response_id = MessageType.CONFIG_RESPONSE + board_id
+        self.zcan.send_fd_message(self.config.channel, can_id, bytes(data))
         
         # Wait for response
         start_time = time.time()
         while time.time() - start_time < timeout:
-            messages = self.zcan.receive_messages()
-            for msg_id, msg_data in messages:
+            messages = self.zcan.receive_fd_messages(self.config.channel)
+            for msg_id, msg_data, _ in messages:
                 if msg_id != response_id:
                     continue
                     
                 # Check if this is a valid response
-                if len(msg_data) >= 5 and msg_data[0] == 0x02 and msg_data[1] == address:
+                if len(msg_data) >= 5 and msg_data[0] == MessageType.COMMAND_WRITE and msg_data[1] == address:
                     # Check for success indicator at byte 4
                     success = msg_data[4] == 0x01
                     if not success:
