@@ -816,18 +816,21 @@ class DexHandBase:
             # Encode command using the function from commands.py
             msg_type, cmd_data = encode_command(command)
             
+            # Get human-readable name for function code
+            function_name = function_code.name if hasattr(function_code, 'name') else f"0x{function_code:x}"
+            
             # Log debug information if requested
             if (log_level is not None and log_level <= LogLevel.DEBUG) or self.log_level <= LogLevel.DEBUG:
-                logger.debug(f"Sending global command: function_code={function_code}, data={data.hex() if data else 'None'}")
+                logger.debug(f"Sending global command: {function_name} (0x{function_code:x}), data={data.hex() if data else 'None'}")
             
             # Send the command
             if not self.zcan.send_fd_message(self.config.channel, msg_type, cmd_data):
-                logger.error(f"Failed to send global command: {function_code}")
+                logger.error(f"Failed to send global command: {function_name} (0x{function_code:x})")
                 return False
             
             # Log success information if requested
             if (log_level is not None and log_level <= LogLevel.INFO) or self.log_level <= LogLevel.INFO:
-                logger.info(f"Successfully sent global command: {function_code}")
+                logger.info(f"Successfully sent global command: {function_name} (0x{function_code:x})")
                 
             return True
             
