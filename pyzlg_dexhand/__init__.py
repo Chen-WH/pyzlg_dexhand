@@ -7,6 +7,7 @@ from .dexhand_interface import (
     HandFeedback,
     JointFeedback,
     StampedTouchFeedback,
+    JointCommand,
 )
 from .zcan_wrapper import ZCANWrapper, MockZCANWrapper
 from .dexhand_logger import DexHandLogger
@@ -21,4 +22,5 @@ __all__ = [
     'HandFeedback',
     'JointFeedback',
     'StampedTouchFeedback',
+    'JointCommand',
 ]

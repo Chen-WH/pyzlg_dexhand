@@ -31,6 +31,29 @@ from .dexhand_protocol.messages import (
     LogLevel,
     process_message,
 )
+from .dexhand_protocol.constants import (
+    NUM_MOTORS,
+    NUM_BOARDS,
+    MOTORS_PER_BOARD,
+    MIN_FIRMWARE_VERSION,
+    DEFAULT_MOTOR_SPEED,
+    DEFAULT_MOTOR_CURRENT,
+    HARDWARE_COUNTS_PER_REV,
+    GEAR_RATIO,
+    RESOLUTION_FACTOR,
+    DEG_PER_REV,
+    CASCADE_PID_SCALE,
+    BROADCAST_FRAME_ID,
+    PRESSURE_LIMIT_SCALE,
+    MOTOR1_ENABLE,
+    MOTOR2_ENABLE,
+    BOTH_MOTORS_ENABLE,
+    MAX_STALL_TIME,
+    MAX_PRESSURE_LIMIT,
+    MIN_MOTOR_CURRENT,
+    MAX_MOTOR_CURRENT,
+)
+from .dexhand_protocol.validation import ValidationHelper
 
 
 logger = logging.getLogger(__name__)
@@ -101,30 +124,7 @@ class HandFeedback:
 
 class DexHandBase:
     """Base class for dexterous hand control"""
-
-    # Hardware configuration constants
-    NUM_MOTORS = 12  # Total motors in hand
-    NUM_BOARDS = 6   # Number of control boards
-    MOTORS_PER_BOARD = 2  # Number of motors per board
-    
-    # Protocol constants
-    MIN_FIRMWARE_VERSION = 25418  # Minimum recommended firmware version
-    
-    # Default values
-    DEFAULT_MOTOR_SPEED = 15000   # Default speed for motors
-    DEFAULT_MOTOR_CURRENT = 20    # Default current in mA
-    
-    # Hardware unit conversion constants
-    HARDWARE_COUNTS_PER_REV = 6   # Encoder counts per revolution
-    GEAR_RATIO = 25              # Gear ratio (25:1)
-    RESOLUTION_FACTOR = 2**4     # 16-bit resolution factor
-    DEG_PER_REV = 360.0          # Degrees per revolution
-    
-    # Hardware unit conversion for CASCADED_PID mode
-    CASCADE_PID_SCALE = 100      # Scale factor for CASCADED_PID mode
-    
-    # Control frames
-    BROADCAST_FRAME_ID = 0x100   # CAN ID for broadcast frames
+    # Constants are now imported from dexhand_protocol.constants
 
     joint_names = [
         "th_dip",
@@ -304,8 +304,8 @@ class DexHandBase:
         
         # Command structure: [write command, address, data...]
         data = bytearray([MessageType.COMMAND_WRITE, address]) + value
-        # Pad to 8 bytes total for CAN message
-        data.extend([0] * (8 - len(data)))
+        # Pad to standard CAN message size using the constant
+        data.extend([0] * (CAN_MESSAGE_PADDING_SIZE - len(data)))
         
         # Send command and wait for response
         response_id = MessageType.CONFIG_RESPONSE + board_id
@@ -491,20 +491,26 @@ class DexHandBase:
         Returns:
             bool: True if set successfully, False otherwise
         """
-        try:
-            if motor_type not in ["motor1", "motor2", "motor"]:
-                logger.error(f"Invalid motor type: {motor_type}")
-                return False
-
-            if not (0 <= stall_time <= 65535):
-                logger.error(f'Stall time out of range: {stall_time}. Must be 0-65535.')
-                return False
-            
-            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}:
-                logger.error(f"Invalid log level: {log_level}")
-                return False
-        except ValueError as e:
-            logger.error(f"Invalid stall time: {e}")
+        # Validate parameters using the ValidationHelper
+        validation_params = {
+            'motor_type': {
+                'value': motor_type,
+                'valid_values': {"motor1", "motor2", "motor"},
+                'instance_type': str
+            },
+            'stall_time': {
+                'value': stall_time,
+                'valid_range': (0, MAX_STALL_TIME),
+                'instance_type': int
+            },
+            'log_level': {
+                'value': log_level,
+                'valid_values': {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}
+            }
+        }
+        
+        is_valid, error_msg = ValidationHelper.validate_parameters(validation_params, log_level)
+        if not is_valid:
             return False
 
         # Convert stall time to bytes (common for all commands)
@@ -546,19 +552,25 @@ class DexHandBase:
         Returns:
             bool: True if set successfully, False otherwise
         """
-        try:
-            if not (0 <= pressure_limit <= 20):
-                logger.error(f"Invalid pressure limit value: {pressure_limit}. Must be 0-20 N.")
-                return False
-            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}:
-                logger.error(f"Invalid log level: {log_level}")
-                return False
-        except ValueError as e:
-            logger.error(f"Invalid pressure limit value: {e}")
+        # Validate parameters using the ValidationHelper
+        validation_params = {
+            'pressure_limit': {
+                'value': pressure_limit,
+                'valid_range': (0, MAX_PRESSURE_LIMIT),
+                'instance_type': int
+            },
+            'log_level': {
+                'value': log_level,
+                'valid_values': {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}
+            }
+        }
+        
+        is_valid, error_msg = ValidationHelper.validate_parameters(validation_params, log_level)
+        if not is_valid:
             return False
 
-        # Construct write command (convert to hardware units - multiply by 100)
-        value_hw = pressure_limit * 100
+        # Construct write command (convert to hardware units using the constant)
+        value_hw = pressure_limit * PRESSURE_LIMIT_SCALE
         data = value_hw.to_bytes(2, byteorder='little')
         command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_VALUE]) + data
 
@@ -586,15 +598,20 @@ class DexHandBase:
         Returns:
             bool: True if command executed successfully, False otherwise
         """
-        try:
-            if not isinstance(pressure_limit_enable, bool):
-                logger.error(f"Invalid pressure limit enable flag: {pressure_limit_enable}")
-                return False
-            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}:
-                logger.error(f"Invalid log level: {log_level}")
-                return False
-        except ValueError as e:
-            logger.error(f"Invalid pressure limit enable: {e}")
+        # Validate parameters using the ValidationHelper
+        validation_params = {
+            'pressure_limit_enable': {
+                'value': pressure_limit_enable,
+                'instance_type': bool
+            },
+            'log_level': {
+                'value': log_level,
+                'valid_values': {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}
+            }
+        }
+        
+        is_valid, error_msg = ValidationHelper.validate_parameters(validation_params, log_level)
+        if not is_valid:
             return False
         
         # Convert boolean to byte
@@ -621,12 +638,15 @@ class DexHandBase:
         """
         log_level = override_level if override_level is not None else self.log_level
         if log_level <= level:
-            if level == LogLevel.DEBUG:
-                logger.debug(message)
-            elif level == LogLevel.INFO:
-                logger.info(message)
-            elif level == LogLevel.ERROR:
-                logger.error(message)
+            # Map log levels to logging functions
+            log_methods = {
+                LogLevel.DEBUG: logger.debug,
+                LogLevel.INFO: logger.info,
+                LogLevel.ERROR: logger.error
+            }
+            # Call the appropriate logging method
+            log_method = log_methods.get(level, logger.info)
+            log_method(message)
 
     def _send_command(self, command: bytes, log_level: Optional[LogLevel] = None) -> bool:
         """
@@ -658,7 +678,7 @@ class DexHandBase:
         board_idx: int,
         motor1_pos: int,
         motor2_pos: int,
-        motor_enable: int = 0x03,
+        motor_enable: int = BOTH_MOTORS_ENABLE,
         control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
         motor1_speed: Optional[int] = None,
         motor2_speed: Optional[int] = None,
@@ -905,6 +925,125 @@ class DexHandBase:
             return False
 
         return True
+    def _prepare_joint_commands(
+        self,
+        th_rot: Optional[Union[float, JointCommand]] = None,
+        th_mcp: Optional[Union[float, JointCommand]] = None,
+        th_dip: Optional[Union[float, JointCommand]] = None,
+        ff_spr: Optional[Union[float, JointCommand]] = None,
+        ff_mcp: Optional[Union[float, JointCommand]] = None,
+        ff_dip: Optional[Union[float, JointCommand]] = None,
+        mf_mcp: Optional[Union[float, JointCommand]] = None,
+        mf_dip: Optional[Union[float, JointCommand]] = None,
+        rf_mcp: Optional[Union[float, JointCommand]] = None,
+        rf_dip: Optional[Union[float, JointCommand]] = None,
+        lf_mcp: Optional[Union[float, JointCommand]] = None,
+        lf_dip: Optional[Union[float, JointCommand]] = None,
+        control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,
+    ) -> Tuple[List[bool], List[int], List[int], List[int]]:
+        """Prepare joint commands by normalizing and scaling all inputs
+        
+        Args:
+            Various joint position arguments (same as move_joints)
+            control_mode: Motor control mode
+            
+        Returns:
+            Tuple of (enable_motors, scaled_positions, motor_speeds, motor_currents)
+        """
+        # Convert all inputs to JointCommand objects for uniform processing
+        joint_commands = [
+            self._normalize_joint_input(th_dip),
+            self._normalize_joint_input(th_mcp),    # Board 0
+            self._normalize_joint_input(th_rot),
+            self._normalize_joint_input(ff_spr),    # Board 1
+            self._normalize_joint_input(ff_dip),
+            self._normalize_joint_input(ff_mcp),    # Board 2
+            self._normalize_joint_input(mf_dip),
+            self._normalize_joint_input(mf_mcp),    # Board 3
+            self._normalize_joint_input(rf_dip),
+            self._normalize_joint_input(rf_mcp),    # Board 4
+            self._normalize_joint_input(lf_dip),
+            self._normalize_joint_input(lf_mcp),    # Board 5
+        ]
+        
+        # Create enable_motors list based on which joints are provided
+        enable_motors = [cmd is not None for cmd in joint_commands]
+        
+        # Initialize motor positions, speeds, and currents
+        scaled_positions = []
+        motor_speeds = []
+        motor_currents = []
+        
+        # Process each joint command
+        for i, cmd in enumerate(joint_commands):
+            if cmd is not None:
+                # Scale position for the specified control mode
+                scaled_positions.append(int(self._scale_angle(i, cmd.position, control_mode)))
+                
+                # Get velocity from joint command or default
+                speed = cmd.velocity if cmd.velocity is not None else DEFAULT_MOTOR_SPEED
+                motor_speeds.append(speed)
+                
+                # Get current from joint command or default
+                current = cmd.current if cmd.current is not None else DEFAULT_MOTOR_CURRENT
+                motor_currents.append(current)
+            else:
+                scaled_positions.append(0)
+                motor_speeds.append(DEFAULT_MOTOR_SPEED)
+                motor_currents.append(DEFAULT_MOTOR_CURRENT)
+                
+        return enable_motors, scaled_positions, motor_speeds, motor_currents
+        
+    def _send_per_board_commands(
+        self,
+        enable_motors: List[bool], 
+        scaled_positions: List[int], 
+        motor_speeds: List[int], 
+        motor_currents: List[int],
+        control_mode: ControlMode,
+        log_level: Optional[LogLevel] = None
+    ) -> bool:
+        """Send individual commands to each board
+        
+        Args:
+            enable_motors: List of which motors to enable
+            scaled_positions: List of scaled position values for each motor
+            motor_speeds: List of speed values for each motor
+            motor_currents: List of current values for each motor
+            control_mode: Motor control mode
+            log_level: Logging level for this operation
+            
+        Returns:
+            bool: True if all commands succeeded
+        """
+        success = True
+        for board_idx in range(NUM_BOARDS):
+            base_idx = board_idx * 2
+            if any(enable_motors[base_idx:base_idx + 2]):
+                motor_enable = MOTOR1_ENABLE if enable_motors[base_idx] else 0
+                motor_enable |= MOTOR2_ENABLE if enable_motors[base_idx + 1] else 0
+                board_success = self.send_motion_command(
+                    board_idx=board_idx,
+                    motor1_pos=scaled_positions[base_idx],
+                    motor2_pos=scaled_positions[base_idx + 1],
+                    motor_enable=motor_enable,
+                    control_mode=control_mode,
+                    motor1_speed=motor_speeds[base_idx],
+                    motor2_speed=motor_speeds[base_idx + 1],
+                    motor1_current=motor_currents[base_idx],
+                    motor2_current=motor_currents[base_idx + 1],
+                    log_level=log_level
+                )
+                if not board_success:
+                    logger.error(f"Failed to send command to board {board_idx}")
+                    success = False
+                    
+        # Log success if requested
+        if success:
+            self._log_at_level("Successfully executed move_joints command", LogLevel.INFO, log_level)
+                
+        return success
+    
     def move_joints(
         self,
         th_rot: Optional[Union[float, JointCommand]] = None,  # thumb rotation
@@ -968,50 +1107,15 @@ class DexHandBase:
                 mf_dip=JointCommand(position=20, velocity=5000)  # Position and velocity, default current
             )
         """
-        # Record command start time
-        command_timestamp = time.time()
-
-        # Convert all inputs to JointCommand objects for uniform processing
-        joint_commands = [
-            self._normalize_joint_input(th_dip),
-            self._normalize_joint_input(th_mcp),    # Board 0
-            self._normalize_joint_input(th_rot),
-            self._normalize_joint_input(ff_spr),    # Board 1
-            self._normalize_joint_input(ff_dip),
-            self._normalize_joint_input(ff_mcp),    # Board 2
-            self._normalize_joint_input(mf_dip),
-            self._normalize_joint_input(mf_mcp),    # Board 3
-            self._normalize_joint_input(rf_dip),
-            self._normalize_joint_input(rf_mcp),    # Board 4
-            self._normalize_joint_input(lf_dip),
-            self._normalize_joint_input(lf_mcp),    # Board 5
-        ]
-        
-        # Create enable_motors list based on which joints are provided
-        enable_motors = [cmd is not None for cmd in joint_commands]
-        
-        # Initialize motor positions, speeds, and currents
-        scaled_positions = []
-        motor_speeds = []
-        motor_currents = []
-        
-        # Process each joint command
-        for i, cmd in enumerate(joint_commands):
-            if cmd is not None:
-                # Scale position for the specified control mode
-                scaled_positions.append(int(self._scale_angle(i, cmd.position, control_mode)))
-                
-                # Get velocity from joint command or default
-                speed = cmd.velocity if cmd.velocity is not None else self.DEFAULT_MOTOR_SPEED
-                motor_speeds.append(speed)
-                
-                # Get current from joint command or default
-                current = cmd.current if cmd.current is not None else self.DEFAULT_MOTOR_CURRENT
-                motor_currents.append(current)
-            else:
-                scaled_positions.append(0)
-                motor_speeds.append(self.DEFAULT_MOTOR_SPEED)
-                motor_currents.append(self.DEFAULT_MOTOR_CURRENT)
+        # Prepare all joint commands
+        enable_motors, scaled_positions, motor_speeds, motor_currents = self._prepare_joint_commands(
+            th_rot=th_rot, th_mcp=th_mcp, th_dip=th_dip,
+            ff_spr=ff_spr, ff_mcp=ff_mcp, ff_dip=ff_dip,
+            mf_mcp=mf_mcp, mf_dip=mf_dip,
+            rf_mcp=rf_mcp, rf_dip=rf_dip,
+            lf_mcp=lf_mcp, lf_dip=lf_dip,
+            control_mode=control_mode
+        )
         
         # Use broadcast mode if requested (more efficient)
         if use_broadcast:
@@ -1032,33 +1136,92 @@ class DexHandBase:
             )
         else:
             # Use traditional per-board commands
-            success = True
-            for board_idx in range(self.NUM_BOARDS):
-                base_idx = board_idx * 2
-                if any(enable_motors[base_idx:base_idx + 2]):
-                    motor_enable = 0x01 if enable_motors[base_idx] else 0
-                    motor_enable |= 0x02 if enable_motors[base_idx + 1] else 0
-                    board_success = self.send_motion_command(
-                        board_idx=board_idx,
-                        motor1_pos=scaled_positions[base_idx],
-                        motor2_pos=scaled_positions[base_idx + 1],
-                        motor_enable=motor_enable,
-                        control_mode=control_mode,
-                        motor1_speed=motor_speeds[base_idx],
-                        motor2_speed=motor_speeds[base_idx + 1],
-                        motor1_current=motor_currents[base_idx],
-                        motor2_current=motor_currents[base_idx + 1],
-                        log_level=log_level
-                    )
-                    if not board_success:
-                        logger.error(f"Failed to send command to board {board_idx}")
-                        success = False
-                        
-            # Log success if requested
-            if success:
-                self._log_at_level("Successfully executed move_joints command", LogLevel.INFO, log_level)
-                    
-            return success
+            return self._send_per_board_commands(
+                enable_motors=enable_motors,
+                scaled_positions=scaled_positions,
+                motor_speeds=motor_speeds,
+                motor_currents=motor_currents,
+                control_mode=control_mode,
+                log_level=log_level
+            )
+            
+    def _process_joint_feedback(self, board_idx: int, state: BoardState) -> Dict[str, JointFeedback]:
+        """Process feedback for joints on a specific board
+        
+        Args:
+            board_idx: Board index
+            state: Board state object
+            
+        Returns:
+            Dictionary mapping joint names to JointFeedback objects
+        """
+        base_idx = board_idx * 2
+        timestamp_feedback = time.time_ns()
+        result = {}
+        
+        if state.feedback is None:
+            # No feedback available, create empty feedback objects
+            for i in range(MOTORS_PER_BOARD):
+                joint_idx = base_idx + i
+                result[self.joint_names[joint_idx]] = JointFeedback(
+                    timestamp=timestamp_feedback,
+                    angle=float("nan"),
+                    encoder_position=None,
+                    current=None,
+                    velocity=None,
+                    error_code=None,
+                    impedance=None
+                )
+            return result
+
+        # Process joint feedback when available
+        motors = [state.feedback.motor1, state.feedback.motor2]
+        for i in range(MOTORS_PER_BOARD):
+            joint_idx = base_idx + i
+            result[self.joint_names[joint_idx]] = JointFeedback(
+                timestamp=timestamp_feedback,
+                angle=motors[i].angle,
+                encoder_position=motors[i].position,
+                current=motors[i].current,
+                velocity=motors[i].velocity,
+                error_code=getattr(motors[i], 'error_code', None),
+                impedance=getattr(motors[i], 'impedance', None)
+            )
+            
+        return result
+        
+    def _process_touch_feedback(self, board_idx: int, state: BoardState) -> Optional[Tuple[str, StampedTouchFeedback]]:
+        """Process touch sensor feedback for a specific board
+        
+        Args:
+            board_idx: Board index
+            state: Board state object
+            
+        Returns:
+            Tuple of (finger_name, touch_feedback) or None if no touch data
+        """
+        if state.feedback is None or state.feedback.tactile is None:
+            return None
+            
+        if board_idx not in self.finger_map:
+            return None
+            
+        timestamp_feedback = time.time_ns()
+        touch_data = state.feedback.tactile
+        finger_name = self.finger_map[board_idx]
+        
+        touch_feedback = StampedTouchFeedback(
+            timestamp=timestamp_feedback,
+            normal_force=touch_data.normal_force,
+            normal_force_delta=touch_data.normal_force_delta,
+            tangential_force=touch_data.tangential_force,
+            tangential_force_delta=touch_data.tangential_force_delta,
+            direction=touch_data.direction,
+            proximity=touch_data.proximity,
+            temperature=touch_data.temperature
+        )
+        
+        return finger_name, touch_feedback
             
     def get_feedback(self) -> HandFeedback:
         """Get feedback from all joints and tactile sensors
@@ -1075,53 +1238,16 @@ class DexHandBase:
         # Process feedback from all boards
         joint_feedback = {}
         touch = {}
+        
         for board_idx, state in self.board_states.items():
-            base_idx = board_idx * 2
-            timestamp_feedback = time.time_ns()
-
-            if state.feedback is None:
-                # No feedback available
-                for i in range(2):
-                    joint_idx = base_idx + i
-                    joint_feedback[self.joint_names[joint_idx]] = JointFeedback(
-                        timestamp=timestamp_feedback,
-                        angle=float("nan"),
-                        encoder_position=None,
-                        current=None,
-                        velocity=None,
-                        error_code=None,
-                        impedance=None
-                    )
-                continue
-
             # Process joint feedback
-            motors = [state.feedback.motor1, state.feedback.motor2]
-            for i in range(2):
-                joint_idx = base_idx + i
-                joint_feedback[self.joint_names[joint_idx]] = JointFeedback(
-                    timestamp=timestamp_feedback,
-                    angle=motors[i].angle,
-                    encoder_position=motors[i].position,
-                    current=motors[i].current,
-                    velocity=motors[i].velocity,
-                    error_code=getattr(motors[i], 'error_code', None),
-                    impedance=getattr(motors[i], 'impedance', None)
-                )
-
+            joint_feedback.update(self._process_joint_feedback(board_idx, state))
+            
             # Process touch sensor feedback if available
-            if state.feedback.tactile is not None:
-                if board_idx in self.finger_map:
-                    touch_data = state.feedback.tactile
-                    touch[self.finger_map[board_idx]] = StampedTouchFeedback(
-                        timestamp=timestamp_feedback,
-                        normal_force=touch_data.normal_force,
-                        normal_force_delta=touch_data.normal_force_delta,
-                        tangential_force=touch_data.tangential_force,
-                        tangential_force_delta=touch_data.tangential_force_delta,
-                        direction=touch_data.direction,
-                        proximity=touch_data.proximity,
-                        temperature=touch_data.temperature
-                    )
+            touch_result = self._process_touch_feedback(board_idx, state)
+            if touch_result:
+                finger_name, touch_feedback = touch_result
+                touch[finger_name] = touch_feedback
 
         return HandFeedback(
             query_timestamp=query_timestamp,
@@ -1238,6 +1364,23 @@ class DexHandBase:
             self.zcan.close()
 
 
+def _load_hand_config(hand_type: str) -> dict:
+    """Load hand configuration from config file
+    
+    Args:
+        hand_type: Type of hand ("left_hand" or "right_hand")
+        
+    Returns:
+        Hand configuration dictionary
+    """
+    config_path = os.path.join(
+        os.path.dirname(__file__), "../config", "config.yaml"
+    )
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    return config["DexHand"][hand_type]
+
+
 class LeftDexHand(DexHandBase):
     """Control interface for left dexterous hand"""
 
@@ -1254,13 +1397,8 @@ class LeftDexHand(DexHandBase):
             device_index: Device index for ZCAN device if creating new instance
             auto_init: Whether to automatically initialize CAN communication
         """
-        config_path = os.path.join(
-            os.path.dirname(__file__), "../config", "config.yaml"
-        )
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
         super().__init__(
-            config["DexHand"]["left_hand"],
+            _load_hand_config("left_hand"),
             BoardID.LEFT_HAND_BASE,
             zcan,
             log_level=log_level,
@@ -1285,13 +1423,8 @@ class RightDexHand(DexHandBase):
             device_index: Device index for ZCAN device if creating new instance
             auto_init: Whether to automatically initialize CAN communication
         """
-        config_path = os.path.join(
-            os.path.dirname(__file__), "../config", "config.yaml"
-        )
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
         super().__init__(
-            config["DexHand"]["right_hand"],
+            _load_hand_config("right_hand"),
             BoardID.RIGHT_HAND_BASE,
             zcan,
             log_level=log_level,
