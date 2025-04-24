@@ -1119,25 +1119,6 @@ class DexHandBase:
         
         return success
     
-    def clear_all_errors(self, log_level: Optional[LogLevel] = None) -> bool:
-        """Clear all errors for the hand using global command (faster)
-        
-        DEPRECATED: Use clear_errors(use_global=True) instead.
-        
-        Args:
-            log_level: Optional logging level for the operation
-            
-        Returns:
-            bool: True if command sent successfully
-        """
-        import warnings
-        warnings.warn(
-            "clear_all_errors is deprecated, use clear_errors(use_global=True) instead", 
-            DeprecationWarning, 
-            stacklevel=2
-        )
-        return self.clear_errors(clear_all=True, use_global=True, log_level=log_level)
-
     def _scale_angle(
         self, motor_idx: int, angle: float, control_mode: ControlMode
     ) -> int:
