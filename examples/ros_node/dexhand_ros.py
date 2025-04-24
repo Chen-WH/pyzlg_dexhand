@@ -412,8 +412,8 @@ class DexHandNode(ROSNode):
             
             self.joint_state_pubs[hand].publish(joint_state_msg)
 
-            # Process tactile feedback
-            if feedback.tactile:
+            # Process touch sensor feedback
+            if feedback.touch:
                 # Create and document touch sensor message (8 values per finger)
                 # Format: [timestamp, normal_force, normal_force_delta, tangential_force, 
                 #          tangential_force_delta, direction, proximity, temperature]
@@ -434,28 +434,28 @@ class DexHandNode(ROSNode):
                 motor_msg.data = [0.0] * 84  # 12 motors * 7 values per motor
 
                 # Map feedback to separate touch and motor arrays
-                for finger_name, tactile_data in feedback.tactile.items():
+                for finger_name, touch_data in feedback.touch.items():
                     if finger_name in self.fingertip_mapping:
                         idx = self.fingertip_mapping[finger_name]
                         
                         # Calculate unified timestamp in seconds (UNIX time)
-                        timestamp = tactile_data.timestamp / 1e9  # Convert nanoseconds to seconds
+                        timestamp = touch_data.timestamp / 1e9  # Convert nanoseconds to seconds
                         
-                        # Set tactile sensor data (8 values per finger)
+                        # Set touch sensor data (8 values per finger)
                         touch_msg.data[8*idx] = timestamp
-                        touch_msg.data[8*idx+1] = tactile_data.normal_force
-                        touch_msg.data[8*idx+2] = tactile_data.normal_force_delta
-                        touch_msg.data[8*idx+3] = tactile_data.tangential_force
-                        touch_msg.data[8*idx+4] = tactile_data.tangential_force_delta
+                        touch_msg.data[8*idx+1] = touch_data.normal_force
+                        touch_msg.data[8*idx+2] = touch_data.normal_force_delta
+                        touch_msg.data[8*idx+3] = touch_data.tangential_force
+                        touch_msg.data[8*idx+4] = touch_data.tangential_force_delta
                         
                         # Validate direction value - should be 0-359 degrees
-                        direction = tactile_data.direction
+                        direction = touch_data.direction
                         if direction == 65535 or direction > 359:
                             direction = -1  # Use -1 to indicate invalid direction
                         touch_msg.data[8*idx+5] = direction
                         
-                        touch_msg.data[8*idx+6] = tactile_data.proximity
-                        touch_msg.data[8*idx+7] = tactile_data.temperature
+                        touch_msg.data[8*idx+6] = touch_data.proximity
+                        touch_msg.data[8*idx+7] = touch_data.temperature
                         
                 # Process all motors using the enhanced JointFeedback data
                 current_time = time.time()  # Use current time for consistency

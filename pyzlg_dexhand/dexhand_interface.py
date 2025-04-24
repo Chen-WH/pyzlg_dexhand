@@ -70,8 +70,8 @@ class JointFeedback:
 
 
 @dataclass
-class StampedTactileFeedback:
-    """Timestamped tactile feedback for a fingertip"""
+class StampedTouchFeedback:
+    """Timestamped touch sensor feedback for a fingertip"""
 
     timestamp: float  # When feedback was received
     normal_force: float  # Normal force in N
@@ -89,7 +89,7 @@ class HandFeedback:
 
     query_timestamp: float  # When feedback was requested
     joints: Dict[str, JointFeedback]  # Feedback per joint
-    tactile: Dict[str, StampedTactileFeedback]  # Tactile data per fingertip
+    touch: Dict[str, StampedTouchFeedback]  # Touch sensor data per fingertip
 
 
 class DexHandBase:
@@ -718,6 +718,9 @@ class DexHandBase:
     ) -> bool:
         """Send a broadcast command to control all motors at once with CAN ID 0x100.
         
+        This method sends a single CAN frame that affects all motors simultaneously,
+        which is more efficient than sending individual commands to each board.
+        
         Args:
             control_mode: Control mode enum
             enable_motors: List of 12 booleans indicating which motors to enable, in order:
@@ -785,10 +788,14 @@ class DexHandBase:
         data: bytes = b'', 
         log_level: Optional[LogLevel] = None
     ) -> bool:
-        """Send a global broadcast command to all boards.
+        """Send a global command that affects all boards simultaneously.
+        
+        Global commands use a special command type that allows a single message
+        to be processed by all boards in the system, such as clearing errors
+        from all boards at once.
         
         Args:
-            function_code: The global function code
+            function_code: The global function code (defined in GlobalFunctionCode enum)
             data: Optional data for the command (max 6 bytes)
             log_level: Logging level for this operation
                     
@@ -1044,7 +1051,7 @@ class DexHandBase:
 
         # Process feedback from all boards
         joint_feedback = {}
-        tactile_feedback = {}
+        touch = {}
         for board_idx, state in self.board_states.items():
             base_idx = board_idx * 2
             timestamp_feedback = time.time_ns()
@@ -1078,25 +1085,25 @@ class DexHandBase:
                     impedance=getattr(motors[i], 'impedance', None)
                 )
 
-            # Process tactile feedback if available
+            # Process touch sensor feedback if available
             if state.feedback.tactile is not None:
                 if board_idx in self.finger_map:
-                    tactile = state.feedback.tactile
-                    tactile_feedback[self.finger_map[board_idx]] = StampedTactileFeedback(
+                    touch_data = state.feedback.tactile
+                    touch[self.finger_map[board_idx]] = StampedTouchFeedback(
                         timestamp=timestamp_feedback,
-                        normal_force=tactile.normal_force,
-                        normal_force_delta=tactile.normal_force_delta,
-                        tangential_force=tactile.tangential_force,
-                        tangential_force_delta=tactile.tangential_force_delta,
-                        direction=tactile.direction,
-                        proximity=tactile.proximity,
-                        temperature=tactile.temperature
+                        normal_force=touch_data.normal_force,
+                        normal_force_delta=touch_data.normal_force_delta,
+                        tangential_force=touch_data.tangential_force,
+                        tangential_force_delta=touch_data.tangential_force_delta,
+                        direction=touch_data.direction,
+                        proximity=touch_data.proximity,
+                        temperature=touch_data.temperature
                     )
 
         return HandFeedback(
             query_timestamp=query_timestamp,
             joints=joint_feedback,
-            tactile=tactile_feedback,
+            touch=touch,
         )
 
     def get_errors(self) -> Dict[int, Optional[ErrorInfo]]:
@@ -1112,7 +1119,8 @@ class DexHandBase:
         
         Args:
             clear_all: If True, attempt to clear errors for all boards even if not in error state
-            use_global: If True, use more efficient global command to clear all errors
+            use_global: If True, use more efficient global command to clear all errors at once
+                        with a single CAN message (recommended)
             log_level: Optional logging level for the operation
             
         Returns:
@@ -1120,6 +1128,7 @@ class DexHandBase:
         """
         # Use the more efficient global command when clearing all errors
         if clear_all and use_global:
+            # Global clear_error command affects all boards simultaneously with one message
             return self.send_global_command(GlobalFunctionCode.CLEAR_ERROR, log_level=log_level)
         
         # Fall back to individual commands for selective clearing
