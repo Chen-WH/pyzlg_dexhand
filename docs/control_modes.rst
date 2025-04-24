@@ -66,17 +66,24 @@ Other Control Modes
 Advanced Movement Options
 ----------------------
 
-Broadcast Mode
-^^^^^^^^^^^^
+Broadcast Mode (Default)
+^^^^^^^^^^^^^^^^^^^^
 
-For more efficient control, the move_joints() method supports a broadcast mode parameter:
+By default, the move_joints() method uses broadcast mode for more efficient control:
 
 .. code-block:: python
 
+    # Uses broadcast mode by default
+    hand.move_joints(
+        th_mcp=30,
+        ff_mcp=45
+    )
+
+    # Explicitly disable broadcast mode if needed
     hand.move_joints(
         th_mcp=30,
         ff_mcp=45,
-        use_broadcast=True  # More efficient communication
+        use_broadcast=False  # Use per-board commands instead
     )
 
 Benefits of broadcast mode:
