@@ -163,7 +163,7 @@ class DexHandNode(ROSNode):
           Data format per motor (motor_index * 7):
             [0] = timestamp (UNIX time in seconds)
             [1] = angle (degrees)
-            [2] = encoder_value (raw units, 0-4095, angle = encoder/11.38)
+            [2] = encoder_position (raw units, 0-4095, angle = encoder/11.38)
             [3] = current (mA)
             [4] = velocity (rpm, 0 if invalid/overflow)
             [5] = error_code (0 if no error)
@@ -458,7 +458,7 @@ class DexHandNode(ROSNode):
                         joint_data = feedback.joints[joint_name]
                         motor_msg.data[7*joint_idx] = current_time
                         motor_msg.data[7*joint_idx+1] = joint_data.angle
-                        motor_msg.data[7*joint_idx+2] = joint_data.encoder_value or 0
+                        motor_msg.data[7*joint_idx+2] = joint_data.encoder_position or 0
                         motor_msg.data[7*joint_idx+3] = joint_data.current or 0
                         
                         # Handle velocity values (fix negative values from signed interpretation)
