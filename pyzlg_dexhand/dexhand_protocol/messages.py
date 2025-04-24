@@ -107,7 +107,7 @@ def process_message(can_id: int, data: bytes) -> ProcessedMessage:
     """
     msg_type = get_message_type(can_id)
     if msg_type is None:
-        raise ValueError(f"Invalid message ID: {can_id:x}")
+        raise ValueError(f"Invalid message ID: {can_id:x} (mask: {can_id & 0xF80:x})")
 
     if msg_type == MessageType.MOTION_FEEDBACK:
         feedback = _decode_feedback(data)

@@ -874,7 +874,13 @@ class DexHandBase:
                         self.board_states[board_idx].error_info = None
                         self.board_states[board_idx].is_normal = True
             except ValueError as e:
-                logger.error(f"Failed to process message: {e}")
+                # Check if this is an "Invalid message ID" error
+                if "Invalid message ID" in str(e):
+                    # Downgrade to warning and include message payload
+                    logger.warning(f"Unknown message type: {e} - Payload: {data.hex() if data else 'empty'}")
+                else:
+                    # Keep other errors as errors
+                    logger.error(f"Failed to process message: {e}")
 
     def _clear_board_error(self, board_idx: int) -> bool:
         """Attempt to clear error state for a board
