@@ -5,7 +5,7 @@ import argparse
 from typing import List
 from IPython import embed
 
-from pyzlg_dexhand.pyzlg_dexhand.dexhand_interface import (
+from pyzlg_dexhand.dexhand_interface import (
     LeftDexHand,
     RightDexHand,
     ControlMode,
@@ -37,6 +37,27 @@ def initialize_hands(hand_names: List[str]) -> dict:
         if not hand.init():
             print(f"Failed to initialize {name} hand")
             continue
+
+        # Check firmware version
+        versions = hand.get_firmware_versions()
+        if versions:
+            # Print firmware versions for this hand
+            print(f"\n{name.upper()} HAND FIRMWARE VERSIONS:")
+            for joint, version in versions.items():
+                if version is not None:
+                    print(f"  {joint}: {version}")
+            
+            # Get unique versions
+            unique_versions = set(v for v in versions.values() if v is not None)
+            if len(unique_versions) > 1:
+                print(f"ERROR: {name} hand has mismatched firmware versions: {unique_versions}")
+                print("Different versions across boards can cause unpredictable behavior.")
+                print("It is recommended to update all boards to the same version.")
+                # Don't exit - this is interactive mode, just warn
+            elif len(unique_versions) == 0:
+                print(f"WARNING: Could not read firmware versions for {name} hand")
+            else:
+                print(f"{name} hand unified firmware version: {list(unique_versions)[0]}")
 
         print(f"Initialized {name} hand")
         hands_dict[name] = hand

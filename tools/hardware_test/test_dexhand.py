@@ -100,6 +100,26 @@ class DexHandTester:
             self.hands[name] = hand_class(self.zcan)
             if not self.hands[name].init():
                 raise RuntimeError(f"Failed to initialize {name} hand")
+                
+            # Check firmware version
+            versions = self.hands[name].get_firmware_versions()
+            if versions:
+                # Print firmware versions for this hand
+                for joint, version in versions.items():
+                    if version is not None:
+                        logger.info(f"{name} hand joint {joint} firmware version: {version}")
+                
+                # Get unique versions
+                unique_versions = set(v for v in versions.values() if v is not None)
+                if len(unique_versions) > 1:
+                    logger.error(f"{name} hand has mismatched firmware versions: {unique_versions}")
+                    raise RuntimeError(f"{name} hand has mismatched firmware versions")
+                elif len(unique_versions) == 0:
+                    logger.error(f"Could not read firmware versions for {name} hand")
+                    raise RuntimeError(f"Could not read firmware versions for {name} hand")
+                else:
+                    logger.info(f"{name} hand firmware version: {list(unique_versions)[0]}")
+            
             logger.info(f"Initialized {name} hand")
 
         # Create results directory

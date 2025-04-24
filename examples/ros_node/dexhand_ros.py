@@ -219,6 +219,25 @@ class DexHandNode(ROSNode):
             self.hands[hand] = hand_class(self.zcan)
             if not self.hands[hand].init():
                 raise RuntimeError(f"Failed to initialize {hand} hand")
+                
+            # Check firmware version
+            versions = self.hands[hand].get_firmware_versions()
+            if versions:
+                # Print firmware versions for this hand
+                for joint, version in versions.items():
+                    if version is not None:
+                        self.logger.info(f"{hand} hand joint {joint} firmware version: {version}")
+                
+                # Get unique versions
+                unique_versions = set(v for v in versions.values() if v is not None)
+                if len(unique_versions) > 1:
+                    self.logger.error(f"{hand} hand has mismatched firmware versions: {unique_versions}")
+                    raise RuntimeError(f"{hand} hand has mismatched firmware versions")
+                elif len(unique_versions) == 0:
+                    self.logger.error(f"Could not read firmware versions for {hand} hand")
+                    raise RuntimeError(f"Could not read firmware versions for {hand} hand")
+                else:
+                    self.logger.info(f"{hand} hand firmware version: {list(unique_versions)[0]}")
 
             # Initialize joint mapping
             self.joint_mappings[hand] = JointMapping("l" if hand == "left" else "r")
