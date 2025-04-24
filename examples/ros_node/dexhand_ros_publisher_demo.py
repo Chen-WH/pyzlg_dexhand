@@ -63,7 +63,7 @@ class DexHandTestNode(ROSNode):
         # Create publishers for commands (one for each hand)
         self.cmd_pubs = {}
         for hand in hands:
-            topic = f"{hand}_hand_joint_commands"
+            topic = f"/{hand}_hand/joint_commands"
             self.cmd_pubs[hand] = self.create_publisher(JointState, topic, 10)
 
         # Create dictionary for current joint positions
@@ -267,7 +267,7 @@ class DexHandTestNode(ROSNode):
 
         if t > self.cycle_time:
             # Call the ros2 service to reset the hand
-            reset_client = self.create_client(Trigger, "/reset_hands")
+            reset_client = self.create_client(Trigger, "/dexhand/reset_hands")
             if reset_client.wait_for_service(timeout_sec=1.0):
                 request = Trigger.Request()
                 reset_client.call_async(request)
