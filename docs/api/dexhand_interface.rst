@@ -53,6 +53,10 @@ Hand Implementations
 Data Classes
 ----------
 
+.. autoclass:: pyzlg_dexhand.dexhand_interface.JointCommand
+    :members:
+    :undoc-members:
+
 .. autoclass:: pyzlg_dexhand.dexhand_interface.HandConfig
     :members:
     :undoc-members:
@@ -61,7 +65,7 @@ Data Classes
     :members:
     :undoc-members:
 
-.. autoclass:: pyzlg_dexhand.dexhand_interface.StampedTactileFeedback
+.. autoclass:: pyzlg_dexhand.dexhand_interface.StampedTouchFeedback
     :members:
     :undoc-members:
 
@@ -84,17 +88,31 @@ Basic Joint Control
 
 .. code-block:: python
 
-    from pyzlg_dexhand import RightDexHand, ControlMode
+    from pyzlg_dexhand import RightDexHand, ControlMode, JointCommand
 
     # Initialize hand
     hand = RightDexHand()
     hand.init()
 
-    # Move thumb
+    # Basic position control
     hand.move_joints(
         th_rot=30,     # Thumb rotation
         th_mcp=45,     # Thumb MCP flexion
         th_dip=45,     # Thumb coupled distal flexion
+        control_mode=ControlMode.IMPEDANCE_GRASP
+    )
+    
+    # Advanced control with JointCommand
+    hand.move_joints(
+        # Position, current and velocity
+        th_rot=JointCommand(position=30, current=25, velocity=12000),
+        
+        # Position and current only
+        th_mcp=JointCommand(position=45, current=30),
+        
+        # Position only - same as th_dip=45
+        th_dip=JointCommand(position=45),
+        
         control_mode=ControlMode.IMPEDANCE_GRASP
     )
 
@@ -110,9 +128,9 @@ Feedback Handling
     thumb_angle = feedback.joints['th_rot'].angle
     thumb_encoder = feedback.joints['th_rot'].encoder_position
 
-    # Access tactile feedback
-    thumb_force = feedback.tactile['th'].normal_force
-    thumb_dir = feedback.tactile['th'].direction
+    # Access touch sensor feedback
+    thumb_force = feedback.touch['th'].normal_force
+    thumb_dir = feedback.touch['th'].direction
 
 Error Handling
 ^^^^^^^^^^^^
@@ -135,8 +153,16 @@ Control Modes
 ^^^^^^^^^^^
 
 * ``CASCADED_PID``: Default mode. Precise position control mode. Provides highest stiffness and position accuracy.
-* ``IMPEDANCE_GRASP``: Mode for impedance control mode. Touching objects using torque control.
-* ``MIT_TORQUE``: High-precision torque control mode. Using Torque to Control Motion.
+* ``IMPEDANCE_GRASP`` (0x77): Optimized for safe grasping operations. This mode:
+    * Provides soft, compliant grasp that adapts to object shape
+    * Automatically detects contact with objects and reduces force
+    * Prevents damage to both the hand and manipulated objects
+    * Maintains position control until contact is detected
+* ``MIT_TORQUE`` (0x66): High-precision torque control that maintains stable force after object contact.
+    * Allows direct proportional force control while maintaining position control
+    * Useful when fine force control is needed during manipulation
+    * Enables dynamic force adjustments during movement
+    * Creates balance between position tracking and force limitation
 * ``HALL_POSITION``: Direct hall sensor position control. Less precise but faster response.
 * ``PROTECT_HALL_POSITION``: Safe hall position control requiring zero position at startup.
 * ``CURRENT``: Direct current control for force-based applications.

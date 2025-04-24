@@ -13,7 +13,7 @@ import datetime  # 添加这个导入
 
 from pyzlg_dexhand.dexhand_interface import (
     DexHandBase, LeftDexHand, RightDexHand, HandConfig,
-    JointFeedback, StampedTactileFeedback, HandFeedback, LogLevel
+    JointFeedback, StampedTouchFeedback, HandFeedback, LogLevel, JointCommand
 )
 from pyzlg_dexhand.dexhand_protocol import BoardID, MessageType, FlashStorageTable
 from pyzlg_dexhand.dexhand_protocol.commands import (

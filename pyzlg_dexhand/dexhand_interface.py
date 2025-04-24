@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Union, Tuple, NamedTuple
 import numpy as np
 import os
 import yaml
@@ -34,6 +34,13 @@ from .dexhand_protocol.messages import (
 
 
 logger = logging.getLogger(__name__)
+
+
+class JointCommand(NamedTuple):
+    """Command for a single joint with position, current, and velocity parameters"""
+    position: float
+    current: Optional[int] = None  # Current in mA
+    velocity: Optional[int] = None  # Velocity in hardware units
 
 
 @dataclass
@@ -891,27 +898,25 @@ class DexHandBase:
         return True
     def move_joints(
         self,
-        th_rot: Optional[float] = None,  # thumb rotation
-        th_mcp: Optional[float] = None,  # thumb metacarpophalangeal
-        th_dip: Optional[float] = None,  # thumb coupled distal joints
-        ff_spr: Optional[float] = None,  # four-finger spread
-        ff_mcp: Optional[float] = None,  # first finger metacarpophalangeal
-        ff_dip: Optional[float] = None,  # first finger coupled distal joints
-        mf_mcp: Optional[float] = None,  # middle finger metacarpophalangeal
-        mf_dip: Optional[float] = None,  # middle finger coupled distal joints
-        rf_mcp: Optional[float] = None,  # ring finger metacarpophalangeal
-        rf_dip: Optional[float] = None,  # ring finger coupled distal joints
-        lf_mcp: Optional[float] = None,  # little finger metacarpophalangeal
-        lf_dip: Optional[float] = None,  # little finger coupled distal joints
+        th_rot: Optional[Union[float, JointCommand]] = None,  # thumb rotation
+        th_mcp: Optional[Union[float, JointCommand]] = None,  # thumb metacarpophalangeal
+        th_dip: Optional[Union[float, JointCommand]] = None,  # thumb coupled distal joints
+        ff_spr: Optional[Union[float, JointCommand]] = None,  # four-finger spread
+        ff_mcp: Optional[Union[float, JointCommand]] = None,  # first finger metacarpophalangeal
+        ff_dip: Optional[Union[float, JointCommand]] = None,  # first finger coupled distal joints
+        mf_mcp: Optional[Union[float, JointCommand]] = None,  # middle finger metacarpophalangeal
+        mf_dip: Optional[Union[float, JointCommand]] = None,  # middle finger coupled distal joints
+        rf_mcp: Optional[Union[float, JointCommand]] = None,  # ring finger metacarpophalangeal
+        rf_dip: Optional[Union[float, JointCommand]] = None,  # ring finger coupled distal joints
+        lf_mcp: Optional[Union[float, JointCommand]] = None,  # little finger metacarpophalangeal
+        lf_dip: Optional[Union[float, JointCommand]] = None,  # little finger coupled distal joints
         control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,  # Control mode
-        speeds: Union[int, List[int]] = DEFAULT_MOTOR_SPEED,  # Speed for all motors or list of speeds
-        currents: Union[int, List[int]] = DEFAULT_MOTOR_CURRENT,  # Current for all motors or list of currents
         use_broadcast: bool = False,  # Whether to use broadcast command (more efficient)
         clear_error: bool = False,  # Whether to clear errors (only for broadcast mode)
         request_feedback: bool = True,  # Whether to request feedback (only for broadcast mode)
         log_level: Optional[LogLevel] = None,  # Log level
     ):
-        """Move hand joints to specified angles.
+        """Move hand joints to specified angles with optional current and velocity settings.
 
         For each finger, there are two independent DOFs:
         - MCP (metacarpophalangeal) joint: Controls base joint flexion
@@ -922,73 +927,82 @@ class DexHandBase:
         - ff_spr: Four-finger spread (abduction between fingers)
 
         Args:
-            th_rot: Thumb rotation angle in degrees
-            th_mcp: Thumb MCP flexion angle
-            th_dip: Thumb coupled PIP-DIP flexion
-            ff_spr: Four-finger spread angle
-            ff_mcp: Index MCP flexion
-            ff_dip: Index coupled PIP-DIP flexion
-            mf_mcp: Middle MCP flexion
-            mf_dip: Middle coupled PIP-DIP flexion
-            rf_mcp: Ring MCP flexion
-            rf_dip: Ring coupled PIP-DIP flexion
-            lf_mcp: Little MCP flexion
-            lf_dip: Little coupled PIP-DIP flexion
+            th_rot: Thumb rotation - float (position only) or JointCommand(position, current, velocity)
+            th_mcp: Thumb MCP flexion - float (position only) or JointCommand(position, current, velocity)
+            th_dip: Thumb coupled PIP-DIP flexion - float (position only) or JointCommand(position, current, velocity)
+            ff_spr: Four-finger spread - float (position only) or JointCommand(position, current, velocity)
+            ff_mcp: Index MCP flexion - float (position only) or JointCommand(position, current, velocity)
+            ff_dip: Index coupled PIP-DIP flexion - float (position only) or JointCommand(position, current, velocity)
+            mf_mcp: Middle MCP flexion - float (position only) or JointCommand(position, current, velocity)
+            mf_dip: Middle coupled PIP-DIP flexion - float (position only) or JointCommand(position, current, velocity)
+            rf_mcp: Ring MCP flexion - float (position only) or JointCommand(position, current, velocity)
+            rf_dip: Ring coupled PIP-DIP flexion - float (position only) or JointCommand(position, current, velocity)
+            lf_mcp: Little MCP flexion - float (position only) or JointCommand(position, current, velocity)
+            lf_dip: Little coupled PIP-DIP flexion - float (position only) or JointCommand(position, current, velocity)
             control_mode: Motor control mode
-            speeds: Either a single speed value for all motors (0-32767) or a list of 12 speed values
-            currents: Either a single current value for all motors (10-599mA) or a list of 12 current values
             use_broadcast: If True, send a single broadcast command for all joints (more efficient)
             clear_error: Whether to clear errors (only for broadcast mode)
             request_feedback: Whether to request feedback (only for broadcast mode)
             log_level: Logging level for this operation
+            
+        Examples:
+            # Move a single joint with position only (using default current and velocity)
+            hand.move_joints(th_rot=45)
+            
+            # Move a single joint with full control over position, current, and velocity
+            hand.move_joints(th_rot=JointCommand(position=45, current=30, velocity=10000))
+            
+            # Move multiple joints with different control approaches
+            hand.move_joints(
+                th_rot=45,  # Position only
+                ff_mcp=JointCommand(position=30, current=50),  # Position and current, default velocity
+                mf_dip=JointCommand(position=20, velocity=5000)  # Position and velocity, default current
+            )
         """
         # Record command start time
         command_timestamp = time.time()
 
-        # Map joint angles to motor commands
-        motor_angles = [
-            th_dip,
-            th_mcp,  # Board 0
-            th_rot,
-            ff_spr,  # Board 1
-            ff_dip,
-            ff_mcp,  # Board 2
-            mf_dip,
-            mf_mcp,  # Board 3
-            rf_dip,
-            rf_mcp,  # Board 4
-            lf_dip,
-            lf_mcp,  # Board 5
+        # Convert all inputs to JointCommand objects for uniform processing
+        joint_commands = [
+            self._normalize_joint_input(th_dip),
+            self._normalize_joint_input(th_mcp),    # Board 0
+            self._normalize_joint_input(th_rot),
+            self._normalize_joint_input(ff_spr),    # Board 1
+            self._normalize_joint_input(ff_dip),
+            self._normalize_joint_input(ff_mcp),    # Board 2
+            self._normalize_joint_input(mf_dip),
+            self._normalize_joint_input(mf_mcp),    # Board 3
+            self._normalize_joint_input(rf_dip),
+            self._normalize_joint_input(rf_mcp),    # Board 4
+            self._normalize_joint_input(lf_dip),
+            self._normalize_joint_input(lf_mcp),    # Board 5
         ]
-
-        # Create enable_motors list based on which angles are provided
-        enable_motors = [angle is not None for angle in motor_angles]
         
-        # Scale angles for the specified control mode
+        # Create enable_motors list based on which joints are provided
+        enable_motors = [cmd is not None for cmd in joint_commands]
+        
+        # Initialize motor positions, speeds, and currents
         scaled_positions = []
-        for i, angle in enumerate(motor_angles):
-            if angle is not None:
-                scaled_positions.append(int(self._scale_angle(i, angle, control_mode)))
+        motor_speeds = []
+        motor_currents = []
+        
+        # Process each joint command
+        for i, cmd in enumerate(joint_commands):
+            if cmd is not None:
+                # Scale position for the specified control mode
+                scaled_positions.append(int(self._scale_angle(i, cmd.position, control_mode)))
+                
+                # Get velocity from joint command or default
+                speed = cmd.velocity if cmd.velocity is not None else self.DEFAULT_MOTOR_SPEED
+                motor_speeds.append(speed)
+                
+                # Get current from joint command or default
+                current = cmd.current if cmd.current is not None else self.DEFAULT_MOTOR_CURRENT
+                motor_currents.append(current)
             else:
                 scaled_positions.append(0)
-        
-        # Handle speed parameter
-        if isinstance(speeds, int):
-            motor_speeds = [speeds] * self.NUM_MOTORS
-        elif len(speeds) == self.NUM_MOTORS:
-            motor_speeds = speeds
-        else:
-            logger.error(f"If speeds is a list, it must contain exactly {self.NUM_MOTORS} values")
-            return False
-            
-        # Handle current parameter
-        if isinstance(currents, int):
-            motor_currents = [currents] * self.NUM_MOTORS
-        elif len(currents) == self.NUM_MOTORS:
-            motor_currents = currents
-        else:
-            logger.error(f"If currents is a list, it must contain exactly {self.NUM_MOTORS} values")
-            return False
+                motor_speeds.append(self.DEFAULT_MOTOR_SPEED)
+                motor_currents.append(self.DEFAULT_MOTOR_CURRENT)
         
         # Use broadcast mode if requested (more efficient)
         if use_broadcast:
@@ -1139,6 +1153,24 @@ class DexHandBase:
                     success = False
         
         return success
+    
+    def _normalize_joint_input(self, value: Optional[Union[float, JointCommand]]) -> Optional[JointCommand]:
+        """Convert float or JointCommand input to a normalized JointCommand
+        
+        Args:
+            value: Input value, can be None, float (position only), or JointCommand
+            
+        Returns:
+            Normalized JointCommand or None if input is None
+        """
+        if value is None:
+            return None
+        elif isinstance(value, (int, float)):
+            return JointCommand(position=float(value))
+        elif isinstance(value, JointCommand):
+            return value
+        else:
+            raise ValueError(f"Invalid joint input: {value}. Must be None, float, or JointCommand")
     
     def _scale_angle(
         self, motor_idx: int, angle: float, control_mode: ControlMode
