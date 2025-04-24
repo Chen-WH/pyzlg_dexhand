@@ -48,7 +48,7 @@ class DampedVelocityKalmanFilter:
         return self.kf.x_post[0, 0]
 
 if __name__ == "__main__":
-    cv_kf = ConstantVelocityKalmanFilter(dt=1, process_noise_var=0.01, measurement_noise_var=5)
+    cv_kf = DampedVelocityKalmanFilter(dt=1, process_noise_var=0.01, measurement_noise_var=5, damping=0.9)
     measurements = [1, 2, 3, 4, 5]  # Example position measurements
     for measurement in measurements:
         cv_kf.predict()

@@ -238,7 +238,12 @@ class DexHandNode(ROSNode):
                     self.logger.error(f"Could not read firmware versions for {hand} hand")
                     raise RuntimeError(f"Could not read firmware versions for {hand} hand")
                 else:
-                    self.logger.info(f"{hand} hand firmware version: {list(unique_versions)[0]}")
+                    version = list(unique_versions)[0]
+                    self.logger.info(f"{hand} hand firmware version: {version}")
+                    
+                    # Check if firmware version meets minimum requirement
+                    if version < DexHandBase.MIN_FIRMWARE_VERSION:
+                        self.logger.warn(f"{hand} hand firmware version {version} is below minimum recommended version {DexHandBase.MIN_FIRMWARE_VERSION}")
 
             # Initialize joint mapping
             self.joint_mappings[hand] = JointMapping("l" if hand == "left" else "r")

@@ -93,6 +93,7 @@ class DexHandBase:
 
     NUM_MOTORS = 12  # Total motors in hand
     NUM_BOARDS = 6  # Number of control boards
+    MIN_FIRMWARE_VERSION = 25418  # Minimum recommended firmware version
 
     joint_names = [
         "th_dip",
@@ -703,8 +704,7 @@ class DexHandBase:
                 elif result.msg_type == MessageType.ERROR_MESSAGE:
                     self.board_states[board_idx].status_timestamp = timestamp
                     self.board_states[board_idx].is_normal = False
-                    #self.board_states[board_idx].error_info = result.error
-                    self.board_states[board_idx].error_info = None
+                    self.board_states[board_idx].error_info = result.error
                 elif result.msg_type == MessageType.CONFIG_RESPONSE:
                     success, command_type = protocol.messages.verify_config_response(
                         msg_id, data
