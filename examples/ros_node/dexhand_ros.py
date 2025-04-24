@@ -140,7 +140,7 @@ class DexHandNode(ROSNode):
             [2] = normal_force_delta (raw units)
             [3] = tangential_force (Newtons)
             [4] = tangential_force_delta (raw units)
-            [5] = direction (0-359 degrees, fingertip is 0)
+            [5] = direction (0-359 degrees, fingertip is 0, -1 if invalid)
             [6] = proximity (raw units)
             [7] = temperature (Celsius)
           
@@ -160,13 +160,14 @@ class DexHandNode(ROSNode):
             [10] = lf_dip
             [11] = lf_mcp
             
-          Data format per motor (motor_index * 6):
+          Data format per motor (motor_index * 7):
             [0] = timestamp (UNIX time in seconds)
             [1] = angle (degrees)
-            [2] = encoder_position (raw units, 0-4095)
+            [2] = encoder_value (raw units, 0-4095, angle = encoder/11.38)
             [3] = current (mA)
-            [4] = velocity (rpm)
+            [4] = velocity (rpm, 0 if invalid/overflow)
             [5] = error_code (0 if no error)
+            [6] = impedance (float, lower values indicate higher resistance to movement)
             
         Finger Mapping (self.fingertip_mapping, for tactile sensors only):
           th (thumb): index 0
@@ -414,14 +415,14 @@ class DexHandNode(ROSNode):
                 ]
                 touch_msg.data = [0.0] * 40  # 5 fingers * 8 values per finger
                 
-                # Create and document motor feedback message (6 values per motor, 12 motors)
-                # Format: [timestamp, angle, encoder_position, current, velocity, impedance]
+                # Create and document motor feedback message (7 values per motor, 12 motors)
+                # Format: [timestamp, angle, encoder_value, current, velocity, error_code, impedance]
                 motor_msg = Float64MultiArray()
                 motor_msg.layout.dim = [
-                    MultiArrayDimension(label="motors", size=12, stride=6),
-                    MultiArrayDimension(label="data", size=6, stride=1)
+                    MultiArrayDimension(label="motors", size=12, stride=7),
+                    MultiArrayDimension(label="data", size=7, stride=1)
                 ]
-                motor_msg.data = [0.0] * 72  # 12 motors * 6 values per motor
+                motor_msg.data = [0.0] * 84  # 12 motors * 7 values per motor
 
                 # Map feedback to separate touch and motor arrays
                 for finger_name, tactile_data in feedback.tactile.items():
@@ -437,7 +438,13 @@ class DexHandNode(ROSNode):
                         touch_msg.data[8*idx+2] = tactile_data.normal_force_delta
                         touch_msg.data[8*idx+3] = tactile_data.tangential_force
                         touch_msg.data[8*idx+4] = tactile_data.tangential_force_delta
-                        touch_msg.data[8*idx+5] = tactile_data.direction
+                        
+                        # Validate direction value - should be 0-359 degrees
+                        direction = tactile_data.direction
+                        if direction == 65535 or direction > 359:
+                            direction = -1  # Use -1 to indicate invalid direction
+                        touch_msg.data[8*idx+5] = direction
+                        
                         touch_msg.data[8*idx+6] = tactile_data.proximity
                         touch_msg.data[8*idx+7] = tactile_data.temperature
                         
@@ -449,12 +456,19 @@ class DexHandNode(ROSNode):
                     # Get joint feedback data if available
                     if joint_name in feedback.joints:
                         joint_data = feedback.joints[joint_name]
-                        motor_msg.data[6*joint_idx] = current_time
-                        motor_msg.data[6*joint_idx+1] = joint_data.angle
-                        motor_msg.data[6*joint_idx+2] = joint_data.encoder_position or 0
-                        motor_msg.data[6*joint_idx+3] = joint_data.current or 0
-                        motor_msg.data[6*joint_idx+4] = joint_data.velocity or 0
-                        motor_msg.data[6*joint_idx+5] = joint_data.error_code or 0
+                        motor_msg.data[7*joint_idx] = current_time
+                        motor_msg.data[7*joint_idx+1] = joint_data.angle
+                        motor_msg.data[7*joint_idx+2] = joint_data.encoder_value or 0
+                        motor_msg.data[7*joint_idx+3] = joint_data.current or 0
+                        
+                        # Handle velocity values (fix negative values from signed interpretation)
+                        velocity = joint_data.velocity
+                        if velocity is not None and velocity < -10000:  # Likely a misinterpreted large value
+                            velocity = 0  # Reset to zero for invalid velocity values
+                        motor_msg.data[7*joint_idx+4] = velocity or 0
+                        
+                        motor_msg.data[7*joint_idx+5] = joint_data.error_code or 0
+                        motor_msg.data[7*joint_idx+6] = joint_data.impedance or 0.0
 
                 # Publish both messages
                 self.touch_sensor_pubs[hand].publish(touch_msg)
