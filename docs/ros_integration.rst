@@ -29,7 +29,7 @@ The ROS node behavior can be customized through ``config/config.yaml`` under the
 +===================+==================================================+================+
 | ``hands``         | Hands to control (left, right, or both)          | ["right"]      |
 +-------------------+--------------------------------------------------+----------------+
-| ``mode``          | Control mode (impedance_grasp, mit_torque, etc.) | "impedance_grasp" |
+| ``mode``          | Control mode (impedance_grasp, mit_torque, cascaded_pid, zero_torque, etc.) | "impedance_grasp" |
 +-------------------+--------------------------------------------------+----------------+
 | ``rate``          | Command send rate in Hz                          | 100.0          |
 +-------------------+--------------------------------------------------+----------------+
@@ -51,31 +51,31 @@ Topics
 +-----------------------------+---------------------------+----------+--------------------------------+
 | Topic (default)             | Type                      | Direction| Description                    |
 +=============================+===========================+==========+================================+
-| /left_hand_joint_commands   | sensor_msgs/JointState    | Input    | Left hand joint commands       |
+| /left_hand/joint_commands   | sensor_msgs/JointState    | Input    | Left hand joint commands       |
 +-----------------------------+---------------------------+----------+--------------------------------+
-| /right_hand_joint_commands  | sensor_msgs/JointState    | Input    | Right hand joint commands      |
+| /right_hand/joint_commands  | sensor_msgs/JointState    | Input    | Right hand joint commands      |
 +-----------------------------+---------------------------+----------+--------------------------------+
-| /left_hand_joint_states     | sensor_msgs/JointState    | Output   | Left hand joint feedback       |
+| /left_hand/joint_states     | sensor_msgs/JointState    | Output   | Left hand joint feedback       |
 +-----------------------------+---------------------------+----------+--------------------------------+
-| /right_hand_joint_states    | sensor_msgs/JointState    | Output   | Right hand joint feedback      |
+| /right_hand/joint_states    | sensor_msgs/JointState    | Output   | Right hand joint feedback      |
 +-----------------------------+---------------------------+----------+--------------------------------+
-| /left_touch_sensors         | Float64MultiArray         | Output   | Left hand touch sensor data    |
+| /left_hand/touch_sensors    | Float64MultiArray         | Output   | Left hand touch sensor data    |
 +-----------------------------+---------------------------+----------+--------------------------------+
-| /right_touch_sensors        | Float64MultiArray         | Output   | Right hand touch sensor data   |
+| /right_hand/touch_sensors   | Float64MultiArray         | Output   | Right hand touch sensor data   |
 +-----------------------------+---------------------------+----------+--------------------------------+
-| /left_motor_feedback        | Float64MultiArray         | Output   | Left hand detailed motor data  |
+| /left_hand/motor_feedback   | Float64MultiArray         | Output   | Left hand detailed motor data  |
 +-----------------------------+---------------------------+----------+--------------------------------+
-| /right_motor_feedback       | Float64MultiArray         | Output   | Right hand detailed motor data |
+| /right_hand/motor_feedback  | Float64MultiArray         | Output   | Right hand detailed motor data |
 +-----------------------------+---------------------------+----------+--------------------------------+
 
 Services
 ^^^^^^
 
-+--------------+-------------------+--------------------------------+
-| Service      | Type              | Description                    |
-+==============+===================+================================+
-| /reset_hands | std_srvs/Trigger  | Reset hands to default position|
-+--------------+-------------------+--------------------------------+
++---------------------+-------------------+--------------------------------+
+| Service             | Type              | Description                    |
++=====================+===================+================================+
+| /dexhand/reset_hands | std_srvs/Trigger  | Reset hands to default position|
++---------------------+-------------------+--------------------------------+
 
 Feedback Data Structure
 ---------------------
@@ -117,7 +117,7 @@ Publishing Joint Commands
     
     # Create node and publisher
     node = create_ros_node('hand_command_publisher')
-    pub = Publisher('/right_hand_joint_commands', JointState, queue_size=10)
+    pub = Publisher('/right_hand/joint_commands', JointState, queue_size=10)
     
     # Create message
     msg = JointState()

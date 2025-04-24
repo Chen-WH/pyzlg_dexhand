@@ -13,22 +13,22 @@ DexHand:
 
     # Control parameters
     rate: 150.0  # Command sending rate in Hz
-    mode: 'cascaded_pid'  # Control mode: zero_torque, current, speed, hall_position, cascaded_pid, protect_hall_position
+    mode: 'impedance_grasp'  # Control mode: impedance_grasp, mit_torque, cascaded_pid, zero_torque, current, speed, hall_position, protect_hall_position
     alpha: 0.2  # Low-pass filter intensity (0-1)
     use_broadcast: true  # Whether to use broadcast mode for more efficient communication
 
     # Topic configuration
     # Left hand topics
-    left_hand_command_topic: '/left_hand_joint_commands'  # Topic to subscribe for joint commands
-    left_hand_joint_feedback_topic: '/left_hand_joint_states'  # Topic to publish joint positions & velocities
-    left_touch_feedback_topic: '/left_touch_sensors'  # Topic to publish touch sensor readings
-    left_motor_feedback_topic: '/left_motor_feedback'  # Topic to publish motor feedback data
+    left_hand_command_topic: '/left_hand/joint_commands'  # Topic to subscribe for joint commands
+    left_hand_joint_feedback_topic: '/left_hand/joint_states'  # Topic to publish joint positions & velocities
+    left_touch_feedback_topic: '/left_hand/touch_sensors'  # Topic to publish touch sensor readings
+    left_motor_feedback_topic: '/left_hand/motor_feedback'  # Topic to publish motor feedback data
 
     # Right hand topics
-    right_hand_command_topic: '/right_hand_joint_commands'  # Topic to subscribe for joint commands
-    right_hand_joint_feedback_topic: '/right_hand_joint_states'  # Topic to publish joint positions & velocities
-    right_touch_feedback_topic: '/right_touch_sensors'  # Topic to publish touch sensor readings
-    right_motor_feedback_topic: '/right_motor_feedback'  # Topic to publish motor feedback data
+    right_hand_command_topic: '/right_hand/joint_commands'  # Topic to subscribe for joint commands
+    right_hand_joint_feedback_topic: '/right_hand/joint_states'  # Topic to publish joint positions & velocities
+    right_touch_feedback_topic: '/right_hand/touch_sensors'  # Topic to publish touch sensor readings
+    right_motor_feedback_topic: '/right_hand/motor_feedback'  # Topic to publish motor feedback data
 
     # Feedback configuration
     enable_feedback: true   # Enable/disable feedback publishing

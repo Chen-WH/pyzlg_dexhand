@@ -305,7 +305,7 @@ class DexHandNode(ROSNode):
                 )
 
         # Initialize reset service
-        self.create_service(Trigger, "reset_hands", self.reset_callback)
+        self.create_service(Trigger, "dexhand/reset_hands", self.reset_callback)
 
         # Set up command sending timer
         period = 1.0 / send_rate

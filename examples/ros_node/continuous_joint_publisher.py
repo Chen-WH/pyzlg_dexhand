@@ -51,11 +51,14 @@ class DexHandContinuousPublisher(ROSNode):
         self.update_period = 1.0 / self.rate
 
         # Create publisher
-        self.publisher = self.create_publisher(
-            JointState,
-            "joint_commands",
-            10
-        )
+        # Create publishers for each hand
+        self.publishers = {}
+        for hand in self.hands:
+            self.publishers[hand] = self.create_publisher(
+                JointState,
+                f"/{hand}_hand/joint_commands",
+                10
+            )
 
         # Initialize timer for continuous publishing
         self.timer = self.create_timer(self.update_period, self.publish_commands)
@@ -141,14 +144,38 @@ class DexHandContinuousPublisher(ROSNode):
             # Add to message
             msg.position.append(value * scale)
 
-        # Publish the message
-        self.publisher.publish(msg)
+        # Get left and right hand joint names
+        left_joints = [name for name in msg.name if name.startswith('l_')]
+        right_joints = [name for name in msg.name if name.startswith('r_')]
+        
+        # Publish to each hand's topic with the appropriate joints
+        if 'left' in self.hands and left_joints:
+            left_msg = JointState()
+            left_msg.header = msg.header
+            
+            # Filter positions for left hand joints
+            indices = [i for i, name in enumerate(msg.name) if name.startswith('l_')]
+            left_msg.name = [msg.name[i] for i in indices]
+            left_msg.position = [msg.position[i] for i in indices]
+            
+            self.publishers['left'].publish(left_msg)
+            
+        if 'right' in self.hands and right_joints:
+            right_msg = JointState()
+            right_msg.header = msg.header
+            
+            # Filter positions for right hand joints
+            indices = [i for i, name in enumerate(msg.name) if name.startswith('r_')]
+            right_msg.name = [msg.name[i] for i in indices]
+            right_msg.position = [msg.position[i] for i in indices]
+            
+            self.publishers['right'].publish(right_msg)
 
     def call_reset_service(self):
         """
         Call the reset_hands service to reset the hand to a known state.
         """
-        reset_client = self.create_client(Trigger, "/reset_hands")
+        reset_client = self.create_client(Trigger, "/dexhand/reset_hands")
         if reset_client.wait_for_service(timeout_sec=1.0):
             request = Trigger.Request()
             result = reset_client.call(request)
