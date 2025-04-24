@@ -1,5 +1,7 @@
 # pyzlg_dexhand/__init__.py
 
+__version__ = "0.1.3"
+
 from .dexhand_interface import (
     LeftDexHand,
     RightDexHand,
@@ -23,4 +25,5 @@ __all__ = [
     'JointFeedback',
     'StampedTouchFeedback',
     'JointCommand',
+    '__version__',
 ]
