@@ -1095,28 +1095,48 @@ class DexHandBase:
         """
         return {i: state.error_info for i, state in self.board_states.items()}
 
-    def clear_errors(self, clear_all=True):
-        """Clear all errors for the hand
-
-        Args:
-            clear_all: If True, attempt to clear errors for all boards even if not in error state
-        """
-        for board_idx in range(self.NUM_BOARDS):
-            if clear_all or not self.board_states[board_idx].is_normal:
-                self._clear_board_error(board_idx)
-    
-    def clear_all_errors(self, log_level: Optional[LogLevel] = None) -> bool:
-        """Clear all errors for the hand(more faster than clear_errors)
+    def clear_errors(self, clear_all=True, use_global=True, log_level: Optional[LogLevel] = None) -> bool:
+        """Clear errors for the hand
         
         Args:
-            log_level: default for LogLevel.INFO:0,All control commands, parameter read and write commands, all feedback information, error messages;
-                        LogLevel.DEBUG:1,All parameter setting commands, parameter setting feedback information, all error messages;
-                        LogLevel.ERROR:2,All error messages;
+            clear_all: If True, attempt to clear errors for all boards even if not in error state
+            use_global: If True, use more efficient global command to clear all errors
+            log_level: Optional logging level for the operation
+            
+        Returns:
+            bool: True if commands sent successfully
+        """
+        # Use the more efficient global command when clearing all errors
+        if clear_all and use_global:
+            return self.send_global_command(GlobalFunctionCode.CLEAR_ERROR, log_level=log_level)
+        
+        # Fall back to individual commands for selective clearing
+        success = True
+        for board_idx in range(self.NUM_BOARDS):
+            if clear_all or not self.board_states[board_idx].is_normal:
+                if not self._clear_board_error(board_idx):
+                    success = False
+        
+        return success
+    
+    def clear_all_errors(self, log_level: Optional[LogLevel] = None) -> bool:
+        """Clear all errors for the hand using global command (faster)
+        
+        DEPRECATED: Use clear_errors(use_global=True) instead.
+        
+        Args:
+            log_level: Optional logging level for the operation
             
         Returns:
             bool: True if command sent successfully
         """
-        return self.send_global_command(GlobalFunctionCode.CLEAR_ERROR, log_level=log_level)
+        import warnings
+        warnings.warn(
+            "clear_all_errors is deprecated, use clear_errors(use_global=True) instead", 
+            DeprecationWarning, 
+            stacklevel=2
+        )
+        return self.clear_errors(clear_all=True, use_global=True, log_level=log_level)
 
     def _scale_angle(
         self, motor_idx: int, angle: float, control_mode: ControlMode
