@@ -50,13 +50,7 @@ def create_mock_feedback(timestamp=1000.0):
             tangential_force_delta=50,
             direction=180,
             proximity=500,
-            temperature=25,
-            encoder1=2048,
-            encoder2=1024,
-            motor1_error=0,
-            motor2_error=0,
-            impedance1=1.0,
-            impedance2=1.0
+            temperature=25
         )
     )
 
