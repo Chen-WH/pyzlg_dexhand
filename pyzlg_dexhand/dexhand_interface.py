@@ -95,9 +95,29 @@ class HandFeedback:
 class DexHandBase:
     """Base class for dexterous hand control"""
 
+    # Hardware configuration constants
     NUM_MOTORS = 12  # Total motors in hand
-    NUM_BOARDS = 6  # Number of control boards
+    NUM_BOARDS = 6   # Number of control boards
+    MOTORS_PER_BOARD = 2  # Number of motors per board
+    
+    # Protocol constants
     MIN_FIRMWARE_VERSION = 25418  # Minimum recommended firmware version
+    
+    # Default values
+    DEFAULT_MOTOR_SPEED = 15000   # Default speed for motors
+    DEFAULT_MOTOR_CURRENT = 20    # Default current in mA
+    
+    # Hardware unit conversion constants
+    HARDWARE_COUNTS_PER_REV = 6   # Encoder counts per revolution
+    GEAR_RATIO = 25              # Gear ratio (25:1)
+    RESOLUTION_FACTOR = 2**4     # 16-bit resolution factor
+    DEG_PER_REV = 360.0          # Degrees per revolution
+    
+    # Hardware unit conversion for CASCADED_PID mode
+    CASCADE_PID_SCALE = 100      # Scale factor for CASCADED_PID mode
+    
+    # Control frames
+    BROADCAST_FRAME_ID = 0x100   # CAN ID for broadcast frames
 
     joint_names = [
         "th_dip",
@@ -126,13 +146,18 @@ class DexHandBase:
             config: dict, 
             base_id: int, 
             zcan: Optional[ZCANWrapper] = None, 
-            log_level: Optional[LogLevel] = LogLevel.INFO):
+            log_level: Optional[LogLevel] = LogLevel.INFO,
+            device_index: int = 0,
+            auto_init: bool = True):
         """Initialize dexterous hand interface
 
         Args:
-            config: Path to hand's YAML config file
+            config: Configuration dictionary for the hand
             base_id: Base board ID (0x01 for left, 0x07 for right)
             zcan: Optional existing ZCANWrapper instance to share between hands
+            log_level: Logging level for this hand instance
+            device_index: Device index for ZCAN device if creating new ZCAN instance
+            auto_init: Whether to automatically initialize CAN communication
         """
         self.config = HandConfig(
             channel=config["channel"], hall_scale=config["hall_scale"]
@@ -141,6 +166,7 @@ class DexHandBase:
         self.zcan = zcan if zcan else ZCANWrapper()
         self._owns_zcan = zcan is None
         self.log_level = log_level
+        self._initialized = False
 
         # Hall position scaling factors
         self._init_hall_scaling()
@@ -156,15 +182,19 @@ class DexHandBase:
             )
             for i in range(self.NUM_BOARDS)
         }
+        
+        # Automatically initialize if requested
+        if auto_init:
+            if not self.init(device_index):
+                logger.error("Failed to automatically initialize DexHand")
 
     def _init_hall_scaling(self):
         """Initialize scaling factors for hall position modes"""
-        # Conversion factor for hall position modes (from protocol spec):
-        # - 6 counts per revolution
-        # - 25:1 gear ratio
-        # - 16-bit resolution
-        # - 360 degrees per revolution
-        factor = 6 * 25 * 2**4 / 360.0  # Converts degrees to hardware units
+        # Conversion factor for hall position modes (from protocol spec)
+        factor = (self.HARDWARE_COUNTS_PER_REV * 
+                  self.GEAR_RATIO * 
+                  self.RESOLUTION_FACTOR / 
+                  self.DEG_PER_REV)  # Converts degrees to hardware units
         self._hall_scale = np.array(self.config.hall_scale) * factor
 
     def init(self, device_index: int = 0) -> bool:
@@ -176,6 +206,12 @@ class DexHandBase:
         Returns:
             bool: True if initialization successful
         """
+        # Skip if already initialized
+        if self._initialized:
+            logger.info("DexHand already initialized")
+            return True
+            
+        # Open ZCAN device if we own it
         if self._owns_zcan:
             if not self.zcan.open(device_index=device_index):
                 logger.error("Failed to open CAN device")
@@ -185,7 +221,9 @@ class DexHandBase:
         if not self.zcan.configure_channel(self.config.channel):
             logger.error(f"Failed to configure channel {self.config.channel}")
             return False
-
+            
+        self._initialized = True
+        logger.info(f"Successfully initialized DexHand with base ID {self.base_id}")
         return True
         
     def read_flash_memory(self, board_idx: int, address: int, timeout: float = 0.1) -> Optional[bytes]:
@@ -391,19 +429,20 @@ class DexHandBase:
 
     def set_safe_temperature(
             self, 
-            safe_temperature: int = None,
+            safe_temperature: int,
             log_level: Optional[LogLevel] = None) -> bool:
         """
         Set the security temperature to prevent overheating (default value is 55℃)
 
         Args:
-            safe_temperature (Uint8): Safety temperature value, ranging from 0 to 255
+            safe_temperature: Safety temperature value, ranging from 0 to 255
+            log_level: Optional logging level for this operation
 
         Returns:
-            bool: True if command sent successfully
+            bool: True if command sent successfully, False otherwise
         """
         try:
-            if safe_temperature is None or not (0 <= safe_temperature <= 255):
+            if not (0 <= safe_temperature <= 255):
                 logger.error(f"Invalid safe temperature: {safe_temperature}")
                 return False
             
@@ -413,77 +452,21 @@ class DexHandBase:
             
         except ValueError as e:
             logger.error(f"Invalid safe temperature: {e}")
-            return
+            return False
         
         # Construct write command
         data = safe_temperature.to_bytes(1, byteorder='little')
         command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_SAFE_TEMPERATURE]) + data
         
         # Send command
-        success = self._send_command(command)
-
-        if log_level is not None:
-            if log_level <= LogLevel.DEBUG:
-                logger.debug("Command sent successfully for set safe temperature: {safe_temperature}")
-        elif self.log_level <= LogLevel.DEBUG:
-            logger.debug("Command sent successfully for set safe temperature: {safe_temperature}")
+        success = self._send_command(command, log_level)
+        
+        if success:
+            self._log_at_level(f"Command sent successfully for set safe temperature: {safe_temperature}", 
+                              LogLevel.DEBUG, log_level)
+        
         return success
 
-    # this usage has been deprecated
-    def current_motor_control_torque(
-            self, 
-            motor_type: str, 
-            current: int,
-            log_level: Optional[LogLevel] = None) -> bool:
-        """
-        ***this usage has been deprecated***
-        Set the motor torque.
-
-        Args:
-            motor_type (str): Motor type, can only be "motor1", "motor2", or "motor"
-            current (int): Torque value, ranging from 0 to 599
-
-        Returns:
-            bool: Returns True if set successfully, otherwise returns False.
-        """
-        try:
-            if motor_type not in ["motor1", "motor2", "motor"]:
-                logger.error(f"Invalid motor type: {motor_type}")
-                return False
-
-            if not (0 <= current <= 599):
-                logger.error(f"Invalid current value: {current}")
-                return False
-            
-            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}:
-                logger.error(f"Invalid log level: {log_level}")
-                return False
-
-            # Select memory address according to motor type
-            if motor_type == "motor1":
-                address = FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE
-                data = current.to_bytes(2, byteorder='little')
-            elif motor_type == "motor2":
-                address = FlashStorageTable.MEMORY_ADDRESS_MOTOR2_TORQUE
-                data = current.to_bytes(2, byteorder='little')
-            elif motor_type == "motor":
-                address = FlashStorageTable.MEMORY_ADDRESS_BOTH_MOTORS_TORQUE
-                data = current.to_bytes(4, byteorder='little') 
-
-        except ValueError as e:
-            logger.error(f"Invalid motor type or current value: {e}")
-            return
-        # Construct write command
-        command = bytes([MessageType.COMMAND_WRITE, address]) + data
-
-        # Send command
-        success = self._send_command(command)
-        if log_level is not None:
-            if log_level <= LogLevel.DEBUG:
-                logger.debug("Command sent successfully for {motor_type} control torque: {current}")
-        elif self.log_level <= LogLevel.DEBUG:
-            logger.debug("Command sent successfully for {motor_type} control torque: {current}")
-        return success
 
     def set_stall_time(
             self, 
@@ -491,22 +474,23 @@ class DexHandBase:
             stall_time: int,
             log_level: Optional[LogLevel] = None) -> bool:
         """
-        Set the stall time (optional).
+        Set the stall time for motor protection.
 
         Args:
-            stall_time (int): The stall time in milliseconds
+            motor_type: Motor type, can be "motor1", "motor2", or "motor" (for both motors)
+            stall_time: The stall time in milliseconds (0-65535)
+            log_level: Optional logging level for this operation
 
         Returns:
-            bool: Returns True if set successfully, False otherwise
+            bool: True if set successfully, False otherwise
         """
-
         try:
             if motor_type not in ["motor1", "motor2", "motor"]:
                 logger.error(f"Invalid motor type: {motor_type}")
                 return False
 
             if not (0 <= stall_time <= 65535):
-                logger.error(f'stall time out of range')
+                logger.error(f'Stall time out of range: {stall_time}. Must be 0-65535.')
                 return False
             
             if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}:
@@ -514,122 +498,143 @@ class DexHandBase:
                 return False
         except ValueError as e:
             logger.error(f"Invalid stall time: {e}")
-            return
+            return False
 
-        # Construct write command
-        data = stall_time.to_bytes(2, byteorder='little') 
+        # Convert stall time to bytes (common for all commands)
+        data = stall_time.to_bytes(2, byteorder='little')
+        
+        # Handle each motor type case
         if motor_type == "motor1":
+            # Motor 1 only
             command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
-            success = self._send_command(command)
+            success = self._send_command(command, log_level)
         elif motor_type == "motor2":
+            # Motor 2 only
             command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR2]) + data
-            success = self._send_command(command)
+            success = self._send_command(command, log_level)
         else:
+            # Both motors
             command1 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + data
             command2 = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR2]) + data
-            # Send command
-            success = self._send_command(command1) and self._send_command(command2)
-        if log_level is not None:
-            if log_level <= LogLevel.DEBUG:
-                logger.debug("Command sent successfully for {motor_type} stall time: {stall_time}")
-        elif self.log_level <= LogLevel.DEBUG:
-            logger.debug("Command sent successfully for set {motor_type} stall time: {stall_time}")
+            success = self._send_command(command1, log_level) and self._send_command(command2, log_level)
+        
+        # Log success message if command succeeded
+        if success:
+            self._log_at_level(f"Command sent successfully for {motor_type} stall time: {stall_time}", 
+                             LogLevel.DEBUG, log_level)
+        
         return success
     
     def set_pressure_limit_value(
             self, 
-            value: int , 
+            pressure_limit: int, 
             log_level: Optional[LogLevel] = None) -> bool:
         """
         Set the pressure limit value.
 
         Args:
-            value (int): Pressure limit value, ranging from 0 to 20 N
-            log_level (LogLevel): Logging level
+            pressure_limit: Pressure limit value, ranging from 0 to 20 N
+            log_level: Optional logging level for this operation
 
         Returns:
-            bool: Returns True if set successfully, False otherwise
+            bool: True if set successfully, False otherwise
         """
         try:
-            if not (0 <= value <= 20):
-                logger.error(f"Invalid pressure limit value: {value}")
+            if not (0 <= pressure_limit <= 20):
+                logger.error(f"Invalid pressure limit value: {pressure_limit}. Must be 0-20 N.")
                 return False
-            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR,None}:
+            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}:
                 logger.error(f"Invalid log level: {log_level}")
                 return False
         except ValueError as e:
             logger.error(f"Invalid pressure limit value: {e}")
-            return
+            return False
 
-        # Construct write command
-        value = value * 100
-        data = value.to_bytes(2, byteorder='little')
+        # Construct write command (convert to hardware units - multiply by 100)
+        value_hw = pressure_limit * 100
+        data = value_hw.to_bytes(2, byteorder='little')
         command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_VALUE]) + data
 
         # Send command
-        success = self._send_command(command)
-        if log_level is not None:
-            if log_level <= LogLevel.DEBUG:
-                logger.debug("Command sent successfully for set pressure limit value: {value}")
-        elif self.log_level <= LogLevel.DEBUG:
-            logger.debug("Command sent successfully for set pressure limit value: {value}")
+        success = self._send_command(command, log_level)
+        
+        if success:
+            self._log_at_level(f"Command sent successfully for pressure limit value: {pressure_limit} N", 
+                             LogLevel.DEBUG, log_level)
+        
         return success
     
     def set_pressure_limit_enable(
         self, 
-        enable: bool, 
+        pressure_limit_enable: bool, 
         log_level: Optional[LogLevel] = None
     ) -> bool:
         """
         Enable/disable the pressure limit function.
 
         Args:
-            enable (bool): True to enable pressure limit, False to disable
-            log_level (LogLevel): Logging level for operation feedback
+            pressure_limit_enable: True to enable pressure limit, False to disable
+            log_level: Optional logging level for this operation
 
         Returns:
             bool: True if command executed successfully, False otherwise
         """
         try:
-            if not isinstance(enable, bool):
-                logger.error(f"Invalid pressure limit enable: {enable}")
+            if not isinstance(pressure_limit_enable, bool):
+                logger.error(f"Invalid pressure limit enable flag: {pressure_limit_enable}")
                 return False
-            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR , None}:
+            if log_level not in {LogLevel.INFO, LogLevel.DEBUG, LogLevel.ERROR, None}:
                 logger.error(f"Invalid log level: {log_level}")
                 return False
         except ValueError as e:
             logger.error(f"Invalid pressure limit enable: {e}")
-            return
+            return False
         
-        data = 1 if enable else 0
-        data = data .to_bytes(1, byteorder='little')
+        # Convert boolean to byte
+        value = 1 if pressure_limit_enable else 0
+        data = value.to_bytes(1, byteorder='little')
+        
+        # Construct and send command
         command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_ENABLE]) + data
-        # Send command
-        success = self._send_command(command)
-        if log_level is not None:
-            if log_level <= LogLevel.DEBUG:
-                logger.debug("Command sent successfully for set pressure limit enable: {enable}")
-        elif self.log_level <= LogLevel.DEBUG:
-            logger.debug("Command sent successfully for set pressure limit enable: {enable}")
+        success = self._send_command(command, log_level)
+        
+        if success:
+            self._log_at_level(f"Command sent successfully for pressure limit enable: {pressure_limit_enable}", 
+                             LogLevel.DEBUG, log_level)
+        
         return success
 
-    def _send_command(self, command: bytes,log_level: Optional[LogLevel] = None) -> bool:
+    def _log_at_level(self, message: str, level: LogLevel = LogLevel.DEBUG, override_level: Optional[LogLevel] = None):
+        """Helper method for consistent logging with level override
+        
+        Args:
+            message: The message to log
+            level: Default log level to use
+            override_level: Optional override log level from method parameter
+        """
+        log_level = override_level if override_level is not None else self.log_level
+        if log_level <= level:
+            if level == LogLevel.DEBUG:
+                logger.debug(message)
+            elif level == LogLevel.INFO:
+                logger.info(message)
+            elif level == LogLevel.ERROR:
+                logger.error(message)
+
+    def _send_command(self, command: bytes, log_level: Optional[LogLevel] = None) -> bool:
         """
         Send a command to the control board.
 
         Args:
             command (bytes): The command data to be sent.
+            log_level: Optional override for logging level
 
         Returns:
             bool: Returns True if set successfully, False otherwise
         """
         try:
-            if log_level is not None:
-                if log_level <= LogLevel.DEBUG:
-                    # Record the original instruction data sent
-                    logger.debug(f"Sending command: {command.hex()}")
-            elif self.log_level <= LogLevel.DEBUG:
-                logger.debug(f"Sending command: {command.hex()}")
+            self._log_at_level(f"Sending command: {command.hex()}", LogLevel.DEBUG, log_level)
+            
             # Send commands to all boards
             for board_idx in range(self.NUM_BOARDS):
                 command_id = self._get_command_id(MessageType.CONFIG_COMMAND, board_idx)
@@ -641,7 +646,7 @@ class DexHandBase:
             logger.error(f"Error sending command: {e}")
             return False
 
-    def _send_motion_command(
+    def send_motion_command(
         self,
         board_idx: int,
         motor1_pos: int,
@@ -652,15 +657,21 @@ class DexHandBase:
         motor2_speed: Optional[int] = None,
         motor1_current: Optional[int] = None,
         motor2_current: Optional[int] = None,
+        log_level: Optional[LogLevel] = None
     ) -> bool:
         """Send a motion command to a specific board
 
         Args:
-            board_idx: Board index to command
+            board_idx: Board index to command (0-5)
             motor1_pos: Position command for motor 1, in hardware units
             motor2_pos: Position command for motor 2, in hardware units
             motor_enable: Motor enable flags, 0x01 for motor 1, 0x02 for motor 2, 0x03 for both
             control_mode: Control mode
+            motor1_speed: Optional speed for motor 1 (0-32767)
+            motor2_speed: Optional speed for motor 2 (0-32767)
+            motor1_current: Optional current for motor 1 (10-599 mA)
+            motor2_current: Optional current for motor 2 (10-599 mA)
+            log_level: Optional logging level for this operation
 
         Returns:
             bool: True if command sent successfully
@@ -686,12 +697,14 @@ class DexHandBase:
         # Send command
         command_id = self._get_command_id(MessageType.MOTION_COMMAND, board_idx)
         if not self.zcan.send_fd_message(self.config.channel, command_id, data):
-            logger.error("Failed to send command to ID {command_id}")
+            logger.error(f"Failed to send command to ID {command_id}")
             return False
-
+            
+        self._log_at_level(f"Successfully sent motion command to board {board_idx}", 
+                         LogLevel.DEBUG, log_level)
         return True
-    
-    def send_broadcast_control_frame(
+        
+    def send_broadcast_command(
         self,
         control_mode: ControlMode,
         enable_motors: List[bool] = None,  # 12 booleans for each motor
@@ -703,7 +716,7 @@ class DexHandBase:
         currents: List[int] = None,   # 12 currents corresponding to each motor
         log_level: Optional[LogLevel] = None
     ) -> bool:
-        """Send a broadcast control frame to control all motors at once with CAN ID 0x100.
+        """Send a broadcast command to control all motors at once with CAN ID 0x100.
         
         Args:
             control_mode: Control mode enum
@@ -715,22 +728,22 @@ class DexHandBase:
             positions: List of 12 position values corresponding to each motor (-32768 to 32767)
             speeds: List of 12 speed values corresponding to each motor (0 to 32767)
             currents: List of 12 current values corresponding to each motor (10 to 599 mA)
-            log_level: Logging level for this operation
+            log_level: Optional logging level for this operation
                     
         Returns:
             bool: True if command sent successfully
         """
         # Default to all motors enabled if not specified
         if enable_motors is None:
-            enable_motors = [True] * 12
+            enable_motors = [True] * self.NUM_MOTORS
         
         # Default values for positions, speeds, currents
         if positions is None:
-            positions = [0] * 12
+            positions = [0] * self.NUM_MOTORS
         if speeds is None:
-            speeds = [15000] * 12  # Default speed: 15000
+            speeds = [self.DEFAULT_MOTOR_SPEED] * self.NUM_MOTORS
         if currents is None:
-            currents = [20] * 12   # Default current: 20mA
+            currents = [self.DEFAULT_MOTOR_CURRENT] * self.NUM_MOTORS
         
         # Create broadcast command
         command = BroadcastCommand(
@@ -748,24 +761,23 @@ class DexHandBase:
             # Encode command using the function from commands.py
             frame_data = encode_broadcast_command(command)
             
-            # Log debug information if requested
-            if (log_level is not None and log_level <= LogLevel.DEBUG) or self.log_level <= LogLevel.DEBUG:
-                logger.debug(f"Sending broadcast control frame: {frame_data.hex()}")
+            self._log_at_level(f"Sending broadcast control frame: {frame_data.hex()}", 
+                             LogLevel.DEBUG, log_level)
             
-            # Send the frame with ID 0x100
-            if not self.zcan.send_fd_message(self.config.channel, 0x100, frame_data):
+            # Send the frame with the broadcast ID
+            if not self.zcan.send_fd_message(self.config.channel, self.BROADCAST_FRAME_ID, frame_data):
                 logger.error("Failed to send broadcast control frame")
                 return False
             
-            # Log success information if requested
-            if (log_level is not None and log_level <= LogLevel.INFO) or self.log_level <= LogLevel.INFO:
-                logger.info("Successfully sent broadcast control frame")
+            self._log_at_level("Successfully sent broadcast control frame", 
+                             LogLevel.INFO, log_level)
                 
             return True
             
         except ValueError as e:
             logger.error(f"Failed to encode broadcast command: {e}")
             return False
+            
         
     def send_global_command(
         self,
@@ -885,8 +897,8 @@ class DexHandBase:
         lf_mcp: Optional[float] = None,  # little finger metacarpophalangeal
         lf_dip: Optional[float] = None,  # little finger coupled distal joints
         control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,  # Control mode
-        speeds: Union[int, List[int]] = 15000,  # Speed for all motors or list of speeds
-        currents: Union[int, List[int]] = 20,  # Current for all motors or list of currents
+        speeds: Union[int, List[int]] = DEFAULT_MOTOR_SPEED,  # Speed for all motors or list of speeds
+        currents: Union[int, List[int]] = DEFAULT_MOTOR_CURRENT,  # Current for all motors or list of currents
         use_broadcast: bool = False,  # Whether to use broadcast command (more efficient)
         clear_error: bool = False,  # Whether to clear errors (only for broadcast mode)
         request_feedback: bool = True,  # Whether to request feedback (only for broadcast mode)
@@ -955,20 +967,20 @@ class DexHandBase:
         
         # Handle speed parameter
         if isinstance(speeds, int):
-            motor_speeds = [speeds] * 12
-        elif len(speeds) == 12:
+            motor_speeds = [speeds] * self.NUM_MOTORS
+        elif len(speeds) == self.NUM_MOTORS:
             motor_speeds = speeds
         else:
-            logger.error(f"If speeds is a list, it must contain exactly 12 values")
+            logger.error(f"If speeds is a list, it must contain exactly {self.NUM_MOTORS} values")
             return False
             
         # Handle current parameter
         if isinstance(currents, int):
-            motor_currents = [currents] * 12
-        elif len(currents) == 12:
+            motor_currents = [currents] * self.NUM_MOTORS
+        elif len(currents) == self.NUM_MOTORS:
             motor_currents = currents
         else:
-            logger.error(f"If currents is a list, it must contain exactly 12 values")
+            logger.error(f"If currents is a list, it must contain exactly {self.NUM_MOTORS} values")
             return False
         
         # Use broadcast mode if requested (more efficient)
@@ -977,7 +989,7 @@ class DexHandBase:
             is_right_hand = isinstance(self, RightDexHand)
             
             # Send the broadcast command
-            return self.send_broadcast_control_frame(
+            return self.send_broadcast_command(
                 control_mode=control_mode,
                 enable_motors=enable_motors,
                 positions=scaled_positions,
@@ -996,7 +1008,7 @@ class DexHandBase:
                 if any(enable_motors[base_idx:base_idx + 2]):
                     motor_enable = 0x01 if enable_motors[base_idx] else 0
                     motor_enable |= 0x02 if enable_motors[base_idx + 1] else 0
-                    board_success = self._send_motion_command(
+                    board_success = self.send_motion_command(
                         board_idx=board_idx,
                         motor1_pos=scaled_positions[base_idx],
                         motor2_pos=scaled_positions[base_idx + 1],
@@ -1006,6 +1018,7 @@ class DexHandBase:
                         motor2_speed=motor_speeds[base_idx + 1],
                         motor1_current=motor_currents[base_idx],
                         motor2_current=motor_currents[base_idx + 1],
+                        log_level=log_level
                     )
                     if not board_success:
                         logger.error(f"Failed to send command to board {board_idx}")
@@ -1013,8 +1026,7 @@ class DexHandBase:
                         
             # Log success if requested
             if success:
-                if (log_level is not None and log_level <= LogLevel.INFO) or self.log_level <= LogLevel.INFO:
-                    logger.info(f"Successfully executed move_joints command")
+                self._log_at_level("Successfully executed move_joints command", LogLevel.INFO, log_level)
                     
             return success
             
@@ -1122,15 +1134,25 @@ class DexHandBase:
     def _scale_angle(
         self, motor_idx: int, angle: float, control_mode: ControlMode
     ) -> int:
-        """Scale angle based on control mode"""
+        """Scale angle based on control mode
+        
+        Args:
+            motor_idx: Motor index (0-11)
+            angle: Angle in degrees
+            control_mode: Control mode enum
+            
+        Returns:
+            Scaled angle value in hardware units
+        """
         if control_mode in (
             ControlMode.HALL_POSITION,
             ControlMode.PROTECT_HALL_POSITION,
         ):
+            # For hall position modes, use hall scaling factors
             return int(angle * self._hall_scale[motor_idx])
         else:
-            # For cascaded PID mode, scale to 100x for hardware units
-            return int(angle * 100)
+            # For other modes (e.g., cascaded PID), use standard scaling
+            return int(angle * self.CASCADE_PID_SCALE)
 
     def reset_joints(self, use_broadcast: bool = False, log_level: Optional[LogLevel] = None):
         """Reset all joints to their zero positions.
@@ -1169,7 +1191,19 @@ class DexHandBase:
 class LeftDexHand(DexHandBase):
     """Control interface for left dexterous hand"""
 
-    def __init__(self, zcan: Optional[ZCANWrapper] = None, log_level: Optional[LogLevel] = LogLevel.INFO):
+    def __init__(self, 
+                 zcan: Optional[ZCANWrapper] = None, 
+                 log_level: Optional[LogLevel] = LogLevel.INFO,
+                 device_index: int = 0,
+                 auto_init: bool = True):
+        """Initialize left hand interface
+        
+        Args:
+            zcan: Optional existing ZCANWrapper instance to share between hands
+            log_level: Logging level for operation feedback
+            device_index: Device index for ZCAN device if creating new instance
+            auto_init: Whether to automatically initialize CAN communication
+        """
         config_path = os.path.join(
             os.path.dirname(__file__), "../config", "config.yaml"
         )
@@ -1179,14 +1213,28 @@ class LeftDexHand(DexHandBase):
             config["DexHand"]["left_hand"],
             BoardID.LEFT_HAND_BASE,
             zcan,
-            log_level=log_level
+            log_level=log_level,
+            device_index=device_index,
+            auto_init=auto_init
         )
 
 
 class RightDexHand(DexHandBase):
     """Control interface for right dexterous hand"""
 
-    def __init__(self, zcan: Optional[ZCANWrapper] = None, log_level: Optional[LogLevel] = LogLevel.INFO):
+    def __init__(self, 
+                 zcan: Optional[ZCANWrapper] = None, 
+                 log_level: Optional[LogLevel] = LogLevel.INFO,
+                 device_index: int = 0,
+                 auto_init: bool = True):
+        """Initialize right hand interface
+        
+        Args:
+            zcan: Optional existing ZCANWrapper instance to share between hands
+            log_level: Logging level for operation feedback
+            device_index: Device index for ZCAN device if creating new instance
+            auto_init: Whether to automatically initialize CAN communication
+        """
         config_path = os.path.join(
             os.path.dirname(__file__), "../config", "config.yaml"
         )
@@ -1196,5 +1244,7 @@ class RightDexHand(DexHandBase):
             config["DexHand"]["right_hand"],
             BoardID.RIGHT_HAND_BASE,
             zcan,
-            log_level=log_level
+            log_level=log_level,
+            device_index=device_index,
+            auto_init=auto_init
         )

@@ -218,7 +218,8 @@ class DexHandNode(ROSNode):
         for hand in hands:
             # Initialize hand with shared ZCAN
             hand_class = LeftDexHand if hand == "left" else RightDexHand
-            self.hands[hand] = hand_class(self.zcan)
+            # Use auto_init=False to explicitly control initialization with proper error handling
+            self.hands[hand] = hand_class(self.zcan, auto_init=False)
             if not self.hands[hand].init():
                 raise RuntimeError(f"Failed to initialize {hand} hand")
                 
@@ -363,8 +364,8 @@ class DexHandNode(ROSNode):
                     use_broadcast=self.use_broadcast,
                 )
 
-                # Clear errors using the unified interface
-                hand_interface.clear_errors(clear_all=True, use_global=self.use_broadcast)
+                # Use the unified error clearing API with global command when broadcast is enabled
+                hand_interface.clear_errors(use_global=self.use_broadcast)
 
                 # Get and publish feedback if enabled
                 if self.enable_feedback:
