@@ -123,21 +123,43 @@ python examples/ros_node/dexhand_ros.py
 
 # 运行演示发布程序（用于测试）
 python examples/ros_node/dexhand_ros_publisher_demo.py --hands right --cycle-time 3.0
+
+# 运行连续关节运动发布程序（用于测试）
+python examples/ros_node/continuous_joint_publisher.py --pattern sine --amplitude 30 --period 5
 ```
 
 接口：
 
-| 话题（默认）        | 类型                     | 方向 | 描述                       |
-| ------------------- | ------------------------ | ---- | -------------------------- |
-| `/joint_commands`   | `sensor_msgs/JointState` | 输入 | 关节位置命令               |
-| `/joint_states`     | `sensor_msgs/JointState` | 输出 | 关节位置反馈（即将推出）   |
-| `/touch_sensors` | TBD                      | 输出 | 触觉传感器数据（即将推出） |
+| 话题（默认）              | 类型                     | 方向 | 描述                     |
+| ------------------------- | ------------------------ | ---- | ------------------------ |
+| `/left_hand_joint_commands` | `sensor_msgs/JointState` | 输入 | 左手关节位置命令          |
+| `/right_hand_joint_commands`| `sensor_msgs/JointState` | 输入 | 右手关节位置命令          |
+| `/left_hand_joint_states`   | `sensor_msgs/JointState` | 输出 | 左手关节位置反馈          |
+| `/right_hand_joint_states`  | `sensor_msgs/JointState` | 输出 | 右手关节位置反馈          |
+| `/left_touch_sensors`       | `Float64MultiArray`      | 输出 | 左手触觉传感器数据        |
+| `/right_touch_sensors`      | `Float64MultiArray`      | 输出 | 右手触觉传感器数据        |
+| `/left_motor_feedback`      | `Float64MultiArray`      | 输出 | 左手详细电机数据          |
+| `/right_motor_feedback`     | `Float64MultiArray`      | 输出 | 右手详细电机数据          |
 
 话题名称可通过 `config/config.yaml` 配置。
 
 | 服务           | 类型               | 描述               |
 | -------------- | ------------------ | ------------------ |
 | `/reset_hands` | `std_srvs/Trigger` | 将手重置至默认位置 |
+
+**消息格式详情：**
+
+- **输入 (JointState)**：标准 `sensor_msgs/JointState` 消息，`position` 字段包含期望的关节角度（单位：度）。
+
+- **触觉传感器输出 (Float64MultiArray)**：
+  - 格式：`[时间戳, 法向力, 法向力变化量, 切向力, 切向力变化量, 方向, 接近度, 温度, ...]`
+  - 结构：5个手指 × 每个手指8个值（共40个值）
+  - 方向值：0-359度，无效读数为-1
+
+- **电机反馈输出 (Float64MultiArray)**：
+  - 格式：`[时间戳, 角度, 编码器位置, 电流, 速度, 错误代码, 阻抗, ...]`
+  - 结构：12个电机 × 每个电机7个值（共84个值）
+  - 错误代码：0 = 无错误
 
 注意：
 
@@ -161,7 +183,7 @@ hand.move_joints(
     th_rot=30,  # 拇指旋转（0-150度）
     th_mcp=45,  # 拇指掌指关节弯曲（0-90度）
     th_dip=45,  # 拇指远端关节弯曲
-    control_mode=ControlMode.IMPEDANCE_GRASP
+    control_mode=ControlMode.CASCADED_PID  # 默认控制模式
 )
 
 # 获取反馈
@@ -174,7 +196,7 @@ print(f"触觉力: {feedback.tactile['th'].normal_force}")
 
 - 控制模式
 
-  - `CASCADED_PID`：提供更高刚度的精确位置控制
+  - `CASCADED_PID`（默认）：提供更高刚度的精确位置控制
   - `PROTECT_HALL_POSITION`：提供更平滑的响应，但要求关节在上电时处于零位
   - `MIT_TORQUE`：高精度的力矩控制，能够在触碰到物体后保持稳定的力度
   - `IMPEDANCE_GRASP`：更好的柔性和适应性，适用于需要轻柔抓握和适应不同物体的应用

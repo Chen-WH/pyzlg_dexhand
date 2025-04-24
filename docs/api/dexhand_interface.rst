@@ -134,9 +134,9 @@ Notes
 Control Modes
 ^^^^^^^^^^^
 
-* ``IMPEDANCE_GRASP``: Default mode for impedance control mode. Touching objects using torque control.
+* ``CASCADED_PID``: Default mode. Precise position control mode. Provides highest stiffness and position accuracy.
+* ``IMPEDANCE_GRASP``: Mode for impedance control mode. Touching objects using torque control.
 * ``MIT_TORQUE``: High-precision torque control mode. Using Torque to Control Motion.
-* ``CASCADED_PID``: precise position control mode. Provides highest stiffness and position accuracy.
 * ``HALL_POSITION``: Direct hall sensor position control. Less precise but faster response.
 * ``PROTECT_HALL_POSITION``: Safe hall position control requiring zero position at startup.
 * ``CURRENT``: Direct current control for force-based applications.
