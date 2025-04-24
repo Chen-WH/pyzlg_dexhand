@@ -15,6 +15,7 @@ DexHand:
     rate: 150.0  # Command sending rate in Hz
     mode: 'cascaded_pid'  # Control mode: zero_torque, current, speed, hall_position, cascaded_pid, protect_hall_position
     alpha: 0.2  # Low-pass filter intensity (0-1)
+    use_broadcast: true  # Whether to use broadcast mode for more efficient communication
 
     # Topic configuration
     # Left hand topics

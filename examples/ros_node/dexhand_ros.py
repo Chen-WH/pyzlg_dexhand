@@ -100,6 +100,7 @@ class DexHandNode(ROSNode):
         control_mode = config.get("mode", "impedance_grasp")
         send_rate = config.get("rate", 100.0)
         filter_alpha = config.get("alpha", 0.1)
+        self.use_broadcast = config.get("use_broadcast", False)
         
         # Topic configuration
         self.topic_config = {
@@ -299,6 +300,7 @@ class DexHandNode(ROSNode):
             f"  Send rate: {send_rate} Hz\n"
             f"  Filter alpha: {filter_alpha}\n"
             f"  Feedback enabled: {self.enable_feedback}\n"
+            f"  Broadcast mode: {self.use_broadcast}\n"
         )
 
     def command_callback(self, msg: JointState, hand: str):
@@ -343,7 +345,7 @@ class DexHandNode(ROSNode):
             for hand, hand_interface in self.hands.items():
                 command = self.last_commands.get(hand, {})
 
-                # Use move_joints interface
+                # Use move_joints interface with broadcast option if enabled
                 hand_interface.move_joints(
                     th_dip=command.get("th_dip"),
                     th_mcp=command.get("th_mcp"),
@@ -358,10 +360,14 @@ class DexHandNode(ROSNode):
                     lf_dip=command.get("lf_dip"),
                     lf_mcp=command.get("lf_mcp"),
                     control_mode=self.control_mode,
+                    use_broadcast=self.use_broadcast,
                 )
 
-                # Clear errors
-                hand_interface.clear_errors(clear_all=True)
+                # Clear errors - using the proper method based on broadcast mode
+                if self.use_broadcast:
+                    hand_interface.clear_all_errors()
+                else:
+                    hand_interface.clear_errors(clear_all=True)
 
                 # Get and publish feedback if enabled
                 if self.enable_feedback:
@@ -502,8 +508,12 @@ class DexHandNode(ROSNode):
                     rf_mcp=30,
                     lf_dip=30,
                     lf_mcp=30,
+                    use_broadcast=self.use_broadcast,
                 )
-                hand.clear_errors()
+                if self.use_broadcast:
+                    hand.clear_all_errors()
+                else:
+                    hand.clear_errors()
 
             # Wait a moment
             time.sleep(0.5)
@@ -511,9 +521,14 @@ class DexHandNode(ROSNode):
             # Then straighten to 0 degrees
             for _ in range(2):
                 for hand in self.hands.values():
-                    hand.reset_joints()
+                    hand.reset_joints(use_broadcast=self.use_broadcast)
                     time.sleep(0.005)
-                    hand.clear_errors()
+                    
+                    if self.use_broadcast:
+                        hand.clear_all_errors()
+                    else:
+                        hand.clear_errors()
+                        
                     time.sleep(0.005)
 
             # Clear command history
