@@ -1131,18 +1131,17 @@ class DexHandBase:
             # For cascaded PID mode, scale to 100x for hardware units
             return int(angle * 100)
 
-    def reset_joints(self,log_level: Optional[LogLevel] = None):
+    def reset_joints(self, use_broadcast: bool = False, log_level: Optional[LogLevel] = None):
         """Reset all joints to their zero positions.
 
         This is equivalent to setting all joint angles to 0 degrees.
-        Uses IMPEDANCE_GRASP control mode.
+        Uses CASCADED_PID control mode.
 
         Args:
-            log_level: default for LogLevel.INFO:0,All control commands, parameter read and write commands, all feedback information, error messages;
-                        LogLevel.DEBUG:1,All parameter setting commands, parameter setting feedback information, all error messages;
-                        LogLevel.ERROR:2,All error messages;
+            use_broadcast: If True, use more efficient broadcast mode
+            log_level: Logging level for the operation
         """
-        self.move_joints(
+        return self.move_joints(
             th_rot=0,
             th_mcp=0,
             th_dip=0,
@@ -1156,12 +1155,9 @@ class DexHandBase:
             lf_mcp=0,
             lf_dip=0,
             control_mode=ControlMode.CASCADED_PID,
+            use_broadcast=use_broadcast,
             log_level=log_level
         )
-        if log_level is not None and log_level <= LogLevel.INFO:
-            logger.info(f"Successfully for reset joints command")
-        elif self.log_level <= LogLevel.INFO:
-            logger.info(f"successfully for reset joints command")
 
     def close(self):
         """Close CAN communication"""
