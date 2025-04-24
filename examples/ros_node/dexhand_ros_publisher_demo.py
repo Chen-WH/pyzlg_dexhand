@@ -60,10 +60,11 @@ class DexHandTestNode(ROSNode):
                     ]
                 )
 
-        # Create publisher for commands
-        self.cmd_pub = self.create_publisher(
-            JointState, "left_hand_joint_commands", 10  # Using global joint states topic
-        )
+        # Create publishers for commands (one for each hand)
+        self.cmd_pubs = {}
+        for hand in hands:
+            topic = f"{hand}_hand_joint_commands"
+            self.cmd_pubs[hand] = self.create_publisher(JointState, topic, 10)
 
         # Create dictionary for current joint positions
         self.current_pos = {name: 0.0 for name in self.joint_names}
@@ -294,10 +295,11 @@ class DexHandTestNode(ROSNode):
         # Get target positions for current sequence
         targets = self.get_target_positions(self.current_sequence, t_norm)
 
-        # Interpolate and publish
+        # Interpolate and publish to each hand
         if targets:
             msg = self.interpolate_positions(targets, 0.1)  # Low pass filter
-            self.cmd_pub.publish(msg)
+            for hand in self.hands:
+                self.cmd_pubs[hand].publish(msg)
 
 
 def main():
