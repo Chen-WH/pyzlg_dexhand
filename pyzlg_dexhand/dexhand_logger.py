@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from .dexhand_interface import (
     ControlMode,
     HandFeedback,
-    StampedTactileFeedback,
+    StampedTouchFeedback,
     JointFeedback,
     LogLevel,
 )
@@ -45,7 +45,7 @@ class FeedbackLogEntry(LogEntry):
     """Log entry for hand feedback"""
 
     joints: Dict[str, JointFeedback]  # Joint name to feedback
-    tactile: Dict[str, StampedTactileFeedback]  # Fingertip name to tactile data
+    tactile: Dict[str, StampedTouchFeedback]  # Fingertip name to touch sensor data
 
 
 class LogWriter(threading.Thread):
@@ -192,7 +192,7 @@ class DexHandLogger:
             hand=hand,
             entry_type="feedback",
             joints=feedback.joints,
-            tactile=feedback.tactile,
+            tactile=feedback.touch,
         )
 
         # Add to buffer thread-safely
