@@ -20,6 +20,23 @@ from pyzlg_dexhand.dexhand_interface import (
     ControlMode,
     ZCANWrapper,
 )
+from pyzlg_dexhand.dexhand_protocol.constants import MIN_FIRMWARE_VERSION, NUM_MOTORS, NUM_BOARDS
+
+# Import joint names from DexHandBase to maintain compatibility
+joint_names = [
+    "th_dip",
+    "th_mcp",      # Board 0: Thumb
+    "th_rot",
+    "ff_spr",      # Board 1: Thumb rotation & spread
+    "ff_dip",
+    "ff_mcp",      # Board 2: First finger
+    "mf_dip",
+    "mf_mcp",      # Board 3: Middle finger
+    "rf_dip",
+    "rf_mcp",      # Board 4: Ring finger
+    "lf_dip",
+    "lf_mcp",      # Board 5: Little finger
+]
 from pyzlg_dexhand.zcan_wrapper import MockZCANWrapper
 
 from filters import DampedVelocityKalmanFilter
@@ -63,7 +80,7 @@ class JointMapping:
     def map_command(self, joint_values: Dict[str, float]) -> Dict[str, float]:
         """Map URDF joint values to hardware commands"""
         # Group joint values by hardware joint
-        hw_joint_values = {dex_joint: [] for dex_joint in DexHandBase.joint_names}
+        hw_joint_values = {dex_joint: [] for dex_joint in joint_names}
 
         for name, value in joint_values.items():
             if name in self.urdf_to_hw:
@@ -72,7 +89,7 @@ class JointMapping:
 
         # Average values for each hardware joint
         command = {}
-        for dex_joint in DexHandBase.joint_names:
+        for dex_joint in joint_names:
             values = hw_joint_values[dex_joint]
             if values:
                 command[dex_joint] = float(np.rad2deg(sum(values) / len(values)))
@@ -147,7 +164,7 @@ class DexHandNode(ROSNode):
           
         Motor Feedback Arrays (/left_motor_feedback and /right_motor_feedback):
           Each array contains 72 values (6 values for each of the 12 motors/joints)
-          Motors are organized by joint index as defined in DexHandBase.joint_names:
+          Motors are organized by joint index as defined in joint_names:
             [0] = th_dip
             [1] = th_mcp 
             [2] = th_rot
@@ -244,8 +261,8 @@ class DexHandNode(ROSNode):
                     self.logger.info(f"{hand} hand firmware version: {version}")
                     
                     # Check if firmware version meets minimum requirement
-                    if version < DexHandBase.MIN_FIRMWARE_VERSION:
-                        self.logger.warn(f"{hand} hand firmware version {version} is below minimum recommended version {DexHandBase.MIN_FIRMWARE_VERSION}")
+                    if version < MIN_FIRMWARE_VERSION:
+                        self.logger.warn(f"{hand} hand firmware version {version} is below minimum recommended version {MIN_FIRMWARE_VERSION}")
 
             # Initialize joint mapping
             self.joint_mappings[hand] = JointMapping("l" if hand == "left" else "r")
@@ -258,7 +275,7 @@ class DexHandNode(ROSNode):
                 self.kalman_filters[hand] = {}
                 self.last_joint_positions[hand] = {}
 
-                for joint_name in DexHandBase.joint_names:
+                for joint_name in joint_names:
                     # Parameters for Kalman filter: dt, process_noise_var, measurement_noise_var, damping
                     self.kalman_filters[hand][joint_name] = DampedVelocityKalmanFilter(
                         dt=self.feedback_dt,
@@ -461,7 +478,7 @@ class DexHandNode(ROSNode):
                 current_time = time.time()  # Use current time for consistency
                 
                 # Populate data for all 12 motors from joint feedback
-                for joint_idx, joint_name in enumerate(DexHandBase.joint_names):
+                for joint_idx, joint_name in enumerate(joint_names):
                     # Get joint feedback data if available
                     if joint_name in feedback.joints:
                         joint_data = feedback.joints[joint_name]
