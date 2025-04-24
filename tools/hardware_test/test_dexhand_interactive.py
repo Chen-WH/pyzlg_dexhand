@@ -119,7 +119,7 @@ def main():
     print("    lf_dip  - Little finger distal joints flexion (0-90 degrees)")
 
     print("\nExample Commands:")
-    print("  Basic position control:")
+    print("  Basic position control (broadcast mode used by default):")
     print(
         f"    {args.hands[i]}_hand.move_joints(th_rot=30, th_mcp=45)        # Move thumb"
     )
@@ -135,7 +135,7 @@ def main():
         f"    {args.hands[i]}_hand.move_joints(th_mcp=JointCommand(position=30, current=300))                # Position with current limit only"
     )
     
-    print("\n  Using different control modes:")
+    print("\n  Using different control modes (broadcast mode used by default):")
     print(
         f"    {args.hands[i]}_hand.move_joints(ff_mcp=90, ff_dip=90, control_mode=ControlMode.PROTECT_HALL_POSITION)       # Protected position control"
     )
@@ -145,13 +145,16 @@ def main():
     print(
         f"    {args.hands[i]}_hand.move_joints(ff_mcp=JointCommand(position=0, current=200), control_mode=ControlMode.MIT_TORQUE)         # MIT torque mode"
     )
+    print(
+        f"    {args.hands[i]}_hand.move_joints(th_rot=45, use_broadcast=False)  # Use per-board commands instead of broadcast mode"
+    )
 
     print("\n  Other commands:")
     print(
-        f"    {args.hands[i]}_hand.reset_joints()           # Move all joints to zero position"
+        f"    {args.hands[i]}_hand.reset_joints()           # Move all joints to zero position (uses broadcast mode by default)"
     )
     print(
-        f"    {args.hands[i]}_hand.reset_joints(use_broadcast=True)  # Reset all joints using broadcast mode (faster)"
+        f"    {args.hands[i]}_hand.reset_joints(use_broadcast=False)  # Reset all joints using per-board commands (slower)"
     )
     print(
         f"    {args.hands[i]}_hand.get_feedback()           # Get current joint and touch feedback"
