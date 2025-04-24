@@ -920,7 +920,7 @@ class DexHandBase:
         lf_mcp: Optional[Union[float, JointCommand]] = None,  # little finger metacarpophalangeal
         lf_dip: Optional[Union[float, JointCommand]] = None,  # little finger coupled distal joints
         control_mode: ControlMode = ControlMode.IMPEDANCE_GRASP,  # Control mode
-        use_broadcast: bool = False,  # Whether to use broadcast command (more efficient)
+        use_broadcast: bool = True,  # Whether to use broadcast command (more efficient)
         clear_error: bool = False,  # Whether to clear errors (only for broadcast mode)
         request_feedback: bool = True,  # Whether to request feedback (only for broadcast mode)
         log_level: Optional[LogLevel] = None,  # Log level
@@ -949,7 +949,7 @@ class DexHandBase:
             lf_mcp: Little MCP flexion - float (position only) or JointCommand(position, current, velocity)
             lf_dip: Little coupled PIP-DIP flexion - float (position only) or JointCommand(position, current, velocity)
             control_mode: Motor control mode
-            use_broadcast: If True, send a single broadcast command for all joints (more efficient)
+            use_broadcast: If True, send a single broadcast command for all joints (more efficient, default: True)
             clear_error: Whether to clear errors (only for broadcast mode)
             request_feedback: Whether to request feedback (only for broadcast mode)
             log_level: Logging level for this operation
@@ -1204,14 +1204,14 @@ class DexHandBase:
             # For other modes (e.g., cascaded PID), use standard scaling
             return int(angle * self.CASCADE_PID_SCALE)
 
-    def reset_joints(self, use_broadcast: bool = False, log_level: Optional[LogLevel] = None):
+    def reset_joints(self, use_broadcast: bool = True, log_level: Optional[LogLevel] = None):
         """Reset all joints to their zero positions.
 
         This is equivalent to setting all joint angles to 0 degrees.
         Uses CASCADED_PID control mode.
 
         Args:
-            use_broadcast: If True, use more efficient broadcast mode
+            use_broadcast: If True, use more efficient broadcast mode (default: True)
             log_level: Logging level for the operation
         """
         return self.move_joints(
