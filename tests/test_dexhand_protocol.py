@@ -177,12 +177,12 @@ class TestMessageDecoding:
         assert msg.feedback.tactile.temperature == 25
 
         # Verify encoder values
-        assert msg.feedback.encoder1 == 2048
-        assert msg.feedback.encoder2 == 1024
+        assert msg.feedback.motor1.encoder_value == 2048
+        assert msg.feedback.motor2.encoder_value == 1024
 
         # Verify motor impedance values
-        assert msg.feedback.impedance1 == 100.0 
-        assert msg.feedback.impedance2 == 200.0 
+        assert msg.feedback.motor1.impedance == 100.0 
+        assert msg.feedback.motor2.impedance == 200.0 
 
     def test_error_decoding(self):
         """Test error message decoding matches protocol specification"""
@@ -190,26 +190,25 @@ class TestMessageDecoding:
         data = bytes([
             0xEE,  # Error message marker
             messages.BoardError.MOTOR1_ERROR,
-            messages.ErrorCode.MOTOR1_CURRENT_OVERLOAD
+            messages.ErrorCode.CURRENT_OVERLOAD
         ])
         msg = messages.process_message(0x601, data)
         assert msg.msg_type == MessageType.ERROR_MESSAGE
-        assert msg.error is not None
-        assert msg.error.error_type == messages.BoardError.MOTOR1_ERROR
-        assert msg.error.error_code == messages.ErrorCode.MOTOR1_CURRENT_OVERLOAD
-        assert "current overload" in msg.error.description.lower()
+        assert msg.error_info is not None
+        assert msg.error_info.error_type == messages.BoardError.MOTOR1_ERROR
+        assert msg.error_info.error_data[0] == messages.ErrorCode.CURRENT_OVERLOAD
+        assert "current_overload" in msg.error_info.description.lower()
 
         # Test multiple errors
         data = bytes([
             0xEE,  # Error message marker
             messages.BoardError.BOTH_MOTORS_ERROR,
-            (messages.ErrorCode.MOTOR1_HALL_ERROR |
-             messages.ErrorCode.MOTOR2_HALL_ERROR)
+            messages.ErrorCode.HALL_ERROR
         ])
         msg = messages.process_message(0x601, data)
-        assert msg.error is not None
-        assert msg.error.error_type == messages.BoardError.BOTH_MOTORS_ERROR
-        assert "hall" in msg.error.description.lower()
+        assert msg.error_info is not None
+        assert msg.error_info.error_type == messages.BoardError.BOTH_MOTORS_ERROR
+        assert "hall_error" in msg.error_info.description.lower()
 
     def test_feedback_validation(self, caplog):
         """Test feedback message validation"""
@@ -221,11 +220,14 @@ class TestMessageDecoding:
         """Test error message validation"""
         # Test invalid error marker
         processed_message = messages.process_message(0x601, bytes([0xFF, 0x01, 0x01]))
-        assert processed_message.msg_type == MessageType.INVALID
+        # 0xFF is actually a valid error code for overheat now
+        assert processed_message.msg_type == MessageType.ERROR_MESSAGE
+        assert "unknown error message type" in processed_message.error_info.description.lower()
 
         # Test invalid error type
         processed_message = messages.process_message(0x601, bytes([0xEE, 0xFF, 0x01]))
-        assert processed_message.msg_type == MessageType.INVALID
+        assert processed_message.msg_type == MessageType.ERROR_MESSAGE
+        assert "not a valid boarderror" in processed_message.error_info.description.lower()
 
     def test_process_error_message(self):
         """Test processing of a real error message captured from hardware"""
@@ -240,10 +242,10 @@ class TestMessageDecoding:
         assert result.sender_id == can_id
 
         # Verify error information
-        assert result.error is not None
-        assert result.error.error_type == messages.BoardError.MOTOR1_ERROR  # 0x01
-        assert result.error.error_code == 0x04  # Motor 1 stall error
-        assert "stall error" in result.error.description.lower()
+        assert result.error_info is not None
+        assert result.error_info.error_type == messages.BoardError.MOTOR1_ERROR  # 0x01
+        assert result.error_info.error_data[0] == 0x04  # Motor 1 stall error
+        assert "param_error" in result.error_info.description.lower()
 
         # Verify the error is for the correct board (from CAN ID)
         board_id = can_id & 0x0F

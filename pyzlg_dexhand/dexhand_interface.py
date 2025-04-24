@@ -59,6 +59,10 @@ class JointFeedback:
     timestamp: float  # When feedback was received
     angle: float  # Joint angle in degrees
     encoder_position: Optional[int] = None  # Encoder position in raw units
+    current: Optional[int] = None  # Current in mA
+    velocity: Optional[int] = None  # Speed in rpm
+    error_code: Optional[int] = None  # Motor error code
+    impedance: Optional[float] = None  # Motor impedance value
 
 
 @dataclass
@@ -73,12 +77,6 @@ class StampedTactileFeedback:
     direction: int  # Force direction (0-359 degrees, fingertip is 0)
     proximity: int  # Proximity value (raw units)
     temperature: int  # Temperature in Celsius
-    encoder1: int   # Raw encoder 1 value (0-4095)
-    encoder2: int   # Raw encoder 2 value (0-4095)
-    motor1_error: int   # Motor 1 error code
-    motor2_error: int   # Motor 2 error code
-    impedance1: float    # Motor 1 impedance reading
-    impedance2: float    # Motor 2 impedance reading
 
 
 @dataclass
@@ -695,6 +693,10 @@ class DexHandBase:
                         timestamp=timestamp_feedback,
                         angle=float("nan"),
                         encoder_position=None,
+                        current=None,
+                        velocity=None,
+                        error_code=None,
+                        impedance=None
                     )
                 continue
 
@@ -706,15 +708,25 @@ class DexHandBase:
                     timestamp=timestamp_feedback,
                     angle=motors[i].angle,
                     encoder_position=motors[i].position,
+                    current=motors[i].current,
+                    velocity=motors[i].velocity,
+                    error_code=getattr(motors[i], 'error_code', None),
+                    impedance=getattr(motors[i], 'impedance', None)
                 )
 
             # Process tactile feedback if available
             if state.feedback.tactile is not None:
                 if board_idx in self.finger_map:
-                    tactile_feedback[self.finger_map[board_idx]] = (
-                        StampedTactileFeedback(
-                            timestamp=timestamp_feedback, **asdict(state.feedback.tactile)
-                        )
+                    tactile = state.feedback.tactile
+                    tactile_feedback[self.finger_map[board_idx]] = StampedTactileFeedback(
+                        timestamp=timestamp_feedback,
+                        normal_force=tactile.normal_force,
+                        normal_force_delta=tactile.normal_force_delta,
+                        tangential_force=tactile.tangential_force,
+                        tangential_force_delta=tactile.tangential_force_delta,
+                        direction=tactile.direction,
+                        proximity=tactile.proximity,
+                        temperature=tactile.temperature
                     )
 
         return HandFeedback(

@@ -45,6 +45,9 @@ class MotorFeedback:
     velocity: int       # Speed in rpm
     position: int       # Position in encoder counts
     angle: float        # Angle in degrees
+    encoder_value: Optional[int] = None   # Raw encoder value (0-4095), angle = encoder/11.38
+    error_code: Optional[int] = None      # Motor error code
+    impedance: Optional[float] = None     # Motor impedance reading (float value)
 
 @dataclass(frozen=True)
 class TactileFeedback:
@@ -54,14 +57,8 @@ class TactileFeedback:
     tangential_force: float       # Tangential force in N
     tangential_force_delta: int   # Change in tangential force (raw units)
     direction: int                # Force direction (0-359 degrees, fingertip is 0)
-    proximity: int               # Proximity value (raw units)
-    temperature: int             # Temperature in Celsius
-    encoder1: int   # Raw encoder 1 value (0-4095)
-    encoder2: int   # Raw encoder 2 value (0-4095)
-    motor1_error: int   # Motor 1 error code
-    motor2_error: int   # Motor 2 error code
-    impedance1: float    # Motor 1 impedance reading
-    impedance2: float    # Motor 2 impedance reading
+    proximity: int                # Proximity value (raw units)
+    temperature: int              # Temperature in Celsius
 
 @dataclass(frozen=True)
 class BoardFeedback:
@@ -148,7 +145,7 @@ def _decode_feedback(data: bytes) -> BoardFeedback:
         raise ValueError("Message too short for basic feedback")
 
     try:
-        # Motor 1 dataOptional[BoardFeedback] = None
+        # Motor 1 data
         current1 = int.from_bytes(data[0:2], 'little', signed=True)
         velocity1 = int.from_bytes(data[2:4], 'little', signed=True)
         position1 = int.from_bytes(data[4:6], 'little', signed=True)
@@ -162,35 +159,83 @@ def _decode_feedback(data: bytes) -> BoardFeedback:
         pos1 = int.from_bytes(data[12:14], 'little', signed=True) / 100.0
         pos2 = int.from_bytes(data[14:16], 'little', signed=True) / 100.0
 
-        # Create motor feedback objects once
+        # Create basic motor feedback objects
         motor1 = MotorFeedback(current1, velocity1, position1, pos1)
         motor2 = MotorFeedback(current2, velocity2, position2, pos2)
 
         # Optional data
         tactile = None
-
-        # Decode tactile if present
-        if len(data) >= 56:
-            tactile = TactileFeedback(
-                normal_force=struct.unpack('<f', data[16:20])[0],
-                normal_force_delta=int.from_bytes(data[20:24], 'little'),
-                tangential_force=struct.unpack('<f', data[24:28])[0],
-                tangential_force_delta=int.from_bytes(data[28:32], 'little'),
-                direction=int.from_bytes(data[32:34], 'little'),
-                proximity=int.from_bytes(data[34:38], 'little'),
-                temperature=int.from_bytes(data[38:42], 'little'),
-                encoder1 = int.from_bytes(data[42:44], 'little'),
-                encoder2 = int.from_bytes(data[44:46], 'little'),
-                motor1_error = data[47],
-                motor2_error = data[48],
-                impedance1 = struct.unpack('<f', data[48:52])[0],  # convert to float
-                impedance2 = struct.unpack('<f', data[52:56])[0],  # convert to float
+        
+        # Adaptively decode based on message length
+        data_len = len(data)
+        
+        # Handle different message lengths (16, 42, or 56 bytes)
+        # Add extended motor data (D42-D55) if available
+        if data_len >= 42:
+            # Get encoder values (D42-D45)
+            encoder1 = int.from_bytes(data[42:44], 'little') if data_len >= 44 else None
+            encoder2 = int.from_bytes(data[44:46], 'little') if data_len >= 46 else None
+            
+            # Get error codes (D46-D47)
+            motor1_error = data[46] if data_len >= 47 else None
+            motor2_error = data[47] if data_len >= 48 else None
+            
+            # Get impedance values (D48-D55)
+            motor1_impedance = None
+            motor2_impedance = None
+            if data_len >= 52:
+                try:
+                    motor1_impedance = struct.unpack('<f', data[48:52])[0]
+                except struct.error:
+                    logger.warning("Failed to decode motor1 impedance")
+            
+            if data_len >= 56:
+                try:
+                    motor2_impedance = struct.unpack('<f', data[52:56])[0]
+                except struct.error:
+                    logger.warning("Failed to decode motor2 impedance")
+            
+            # Update motor objects with extended data
+            motor1 = MotorFeedback(
+                current=current1, 
+                velocity=velocity1, 
+                position=position1, 
+                angle=pos1,
+                encoder_value=encoder1,
+                error_code=motor1_error,
+                impedance=motor1_impedance
             )
-            if np.isnan(tactile.normal_force) or np.isnan(tactile.tangential_force):
-                logger.warning("Invalid tactile sensor data: normal/tangential force is NaN")
+            
+            motor2 = MotorFeedback(
+                current=current2, 
+                velocity=velocity2, 
+                position=position2, 
+                angle=pos2,
+                encoder_value=encoder2,
+                error_code=motor2_error,
+                impedance=motor2_impedance
+            )
 
+        # Decode tactile sensor data if present
+        # Tactile data starts at index 16, need at least 42 bytes for complete tactile data
+        if data_len >= 42:  # Full tactile data available
+            try:
+                tactile = TactileFeedback(
+                    normal_force=struct.unpack('<f', data[16:20])[0],
+                    normal_force_delta=int.from_bytes(data[20:24], 'little'),
+                    tangential_force=struct.unpack('<f', data[24:28])[0],
+                    tangential_force_delta=int.from_bytes(data[28:32], 'little'),
+                    direction=int.from_bytes(data[32:34], 'little'),
+                    proximity=int.from_bytes(data[34:38], 'little'),
+                    temperature=int.from_bytes(data[38:42], 'little'),
+                )
+                if np.isnan(tactile.normal_force) or np.isnan(tactile.tangential_force):
+                    logger.warning("Invalid tactile sensor data: normal/tangential force is NaN")
+            except Exception as e:
+                logger.warning(f"Failed to decode tactile data: {e}")
+                tactile = None
 
-        # Create BoardFeedback instance once with all data
+        # Create BoardFeedback instance with all available data
         return BoardFeedback(
             motor1=motor1,
             motor2=motor2,
