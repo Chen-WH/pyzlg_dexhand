@@ -8,7 +8,7 @@ setup(
     install_requires=[
         "numpy",
         "pyyaml",
-        "ipython",
+        "ipython[all]",  # Includes necessary sqlite dependencies
         "matplotlib",
         "pandas",
         "filterpy",
