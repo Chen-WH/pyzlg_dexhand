@@ -18,10 +18,31 @@ The primary interface for controlling the DexHand is the ``move_joints()`` funct
         control_mode=ControlMode.IMPEDANCE_GRASP
     )
 
-Additional Parameters
-------------------
+JointCommand Parameters
+--------------------
 
-The ``move_joints()`` function supports several additional parameters to customize control:
+The ``move_joints()`` function now supports the ``JointCommand`` type, which gives you more granular control over position, current, and velocity for each joint:
+
+.. code-block:: python
+
+    from pyzlg_dexhand import JointCommand
+
+    # Move a single joint with position only
+    hand.move_joints(th_rot=45)
+    
+    # Move a joint with full control (position, current, velocity)
+    hand.move_joints(
+        th_rot=JointCommand(position=45, current=30, velocity=10000)
+    )
+    
+    # Mix and match parameter styles for different joints
+    hand.move_joints(
+        th_rot=45,  # Position only (using defaults for current and velocity)
+        ff_mcp=JointCommand(position=30, current=50),  # Position and current
+        mf_dip=JointCommand(position=20, velocity=5000)  # Position and velocity
+    )
+
+This approach is more flexible than the older style of using ``speeds`` and ``currents`` parameters, which are still supported for backward compatibility.
 
 Control Mode Selection
 ^^^^^^^^^^^^^^^^^^^^^
@@ -35,48 +56,6 @@ Control the behavior of the motors using different control strategies:
         th_mcp=30,
         ff_mcp=45,
         control_mode=ControlMode.MIT_TORQUE
-    )
-
-Speed Control
-^^^^^^^^^^^
-
-Control motor velocities (in RPM):
-
-.. code-block:: python
-
-    # Single speed value for all motors
-    hand.move_joints(
-        th_mcp=30,
-        speeds=15000  # Default is 15000 RPM
-    )
-
-    # Individual speeds for each motor
-    hand.move_joints(
-        th_mcp=30,
-        ff_mcp=45,
-        speeds=[12000, 12000, 15000, 15000, 15000, 15000, 
-                15000, 15000, 15000, 15000, 15000, 15000]  # Must have 12 values
-    )
-
-Current Limits
-^^^^^^^^^^^^
-
-Set motor current limits (in mA):
-
-.. code-block:: python
-
-    # Single current value for all motors
-    hand.move_joints(
-        th_mcp=30,
-        currents=20  # Default is 20 mA
-    )
-
-    # Individual currents for each motor
-    hand.move_joints(
-        th_mcp=30,
-        ff_mcp=45,
-        currents=[30, 30, 20, 20, 20, 20, 
-                  20, 20, 20, 20, 20, 20]  # Must have 12 values
     )
 
 Broadcast Mode (Default)
@@ -116,6 +95,23 @@ The ``move_joints()`` function uses an efficient broadcast mode by default that 
 **Implementation note:**
 
 With broadcast mode (default), the system uses a more efficient communication protocol internally that sends one command affecting all motors, rather than individual commands to each board.
+
+Additional Options
+------------------
+
+The ``move_joints()`` function supports several additional parameters:
+
+.. code-block:: python
+
+    hand.move_joints(
+        th_rot=30,
+        th_mcp=45,
+        control_mode=ControlMode.IMPEDANCE_GRASP,
+        use_broadcast=True,          # More efficient communication (default)
+        clear_error=True,            # Clear any errors during command (broadcast only)
+        request_feedback=True,       # Request feedback after command (broadcast only)
+        log_level=LogLevel.INFO      # Logging level for this operation
+    )
 
 Error Handling
 ------------
