@@ -127,9 +127,9 @@ Fine-tune individual joint parameters using the JointCommand class:
 Error Handling Options
 ^^^^^^^^^^^^^^^^^^
 
-Efficiently clear errors using the global parameter:
+Efficiently clear errors using the broadcast parameter:
 
 .. code-block:: python
 
     # Efficiently clear all errors with a single command
-    hand.clear_errors(use_global=True)  # Recommended for better performance
+    hand.clear_errors(use_broadcast=True)  # Recommended for better performance

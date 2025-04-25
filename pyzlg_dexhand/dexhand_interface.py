@@ -1263,21 +1263,21 @@ class DexHandBase:
         """
         return {i: state.error_info for i, state in self.board_states.items()}
 
-    def clear_errors(self, clear_all=True, use_global=True, log_level: Optional[LogLevel] = None) -> bool:
+    def clear_errors(self, clear_all=True, use_broadcast=True, log_level: Optional[LogLevel] = None) -> bool:
         """Clear errors for the hand
         
         Args:
             clear_all: If True, attempt to clear errors for all boards even if not in error state
-            use_global: If True, use more efficient global command to clear all errors at once
-                        with a single CAN message (recommended)
+            use_broadcast: If True, use more efficient broadcast command to clear all errors at once
+                          with a single CAN message (recommended)
             log_level: Optional logging level for the operation
             
         Returns:
             bool: True if commands sent successfully
         """
-        # Use the more efficient global command when clearing all errors
-        if clear_all and use_global:
-            # Global clear_error command affects all boards simultaneously with one message
+        # Use the more efficient broadcast command when clearing all errors
+        if clear_all and use_broadcast:
+            # Broadcast clear_error command affects all boards simultaneously with one message
             return self.send_global_command(GlobalFunctionCode.CLEAR_ERROR, log_level=log_level)
         
         # Fall back to individual commands for selective clearing

@@ -116,14 +116,14 @@ The ``move_joints()`` function supports several additional parameters:
 Error Handling
 ------------
 
-The ``clear_errors()`` function accepts a ``use_global`` parameter that also enables more efficient communication:
+The ``clear_errors()`` function accepts a ``use_broadcast`` parameter that also enables more efficient communication:
 
 .. code-block:: python
 
     # Efficiently clear all errors with a single command
-    hand.clear_errors(use_global=True)  # Recommended
+    hand.clear_errors(use_broadcast=True)  # Recommended
 
     # Or clear specific error states
-    hand.clear_errors(clear_all=False, use_global=False)
+    hand.clear_errors(clear_all=False, use_broadcast=False)
 
 Using this optimized approach is recommended in most cases for better performance.

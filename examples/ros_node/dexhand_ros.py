@@ -381,8 +381,8 @@ class DexHandNode(ROSNode):
                     use_broadcast=self.use_broadcast,
                 )
 
-                # Use the unified error clearing API with global command when broadcast is enabled
-                hand_interface.clear_errors(use_global=self.use_broadcast)
+                # Use the unified error clearing API with broadcast mode when enabled
+                hand_interface.clear_errors(use_broadcast=self.use_broadcast)
 
                 # Get and publish feedback if enabled
                 if self.enable_feedback:
@@ -525,7 +525,7 @@ class DexHandNode(ROSNode):
                     lf_mcp=30,
                     use_broadcast=self.use_broadcast,
                 )
-                hand.clear_errors(use_global=self.use_broadcast)
+                hand.clear_errors(use_broadcast=self.use_broadcast)
 
             # Wait a moment
             time.sleep(0.5)
@@ -536,7 +536,7 @@ class DexHandNode(ROSNode):
                     hand.reset_joints(use_broadcast=self.use_broadcast)
                     time.sleep(0.005)
                     
-                    hand.clear_errors(use_global=self.use_broadcast)
+                    hand.clear_errors(use_broadcast=self.use_broadcast)
                         
                     time.sleep(0.005)
 
