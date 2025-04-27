@@ -10,7 +10,7 @@ from unittest.mock import patch, Mock
 
 from pyzlg_dexhand.dexhand_logger import DexHandLogger
 from pyzlg_dexhand.dexhand_interface import (
-    HandFeedback, JointFeedback, StampedTactileFeedback,
+    HandFeedback, JointFeedback, StampedTouchFeedback,
     ControlMode, LogLevel
 )
 
@@ -36,8 +36,8 @@ def mock_feedback():
                 encoder_position=500
             )
         },
-        tactile={
-            'th': StampedTactileFeedback(
+        touch={
+            'th': StampedTouchFeedback(
                 timestamp=time.time(),
                 normal_force=1.5,
                 normal_force_delta=100,
@@ -115,7 +115,7 @@ class TestDexHandLogger:
         assert len(test_logger.feedback_buffers["left"]) == 1
         fb = test_logger.feedback_buffers["left"][0]
         assert "th_rot" in fb.joints
-        assert "th" in fb.tactile
+        assert "th" in fb.touch
 
         # Check file
         fb_file = test_logger.session_dir / "left_feedback.jsonl"
@@ -125,8 +125,8 @@ class TestDexHandLogger:
             data = json.loads(lines[0])
             assert "joints" in data
             assert "th_rot" in data["joints"]
-            assert "tactile" in data
-            assert "th" in data["tactile"]
+            assert "touch" in data
+            assert "th" in data["touch"]
 
     def test_save_metadata(self, test_logger):
         """Test metadata saving"""
@@ -161,9 +161,9 @@ class TestDexHandLogger:
 
         # Check if plot files were created
         assert (test_logger.session_dir / "left_joints.png").exists()
-        # If tactile data exists, should have tactile plot
-        if mock_feedback.tactile:
-            assert (test_logger.session_dir / "left_tactile.png").exists()
+        # If touch data exists, should have touch plot
+        if mock_feedback.touch:
+            assert (test_logger.session_dir / "left_touch.png").exists()
 
     def test_close(self, test_logger, joint_commands, mock_feedback):
         """Test logger closing"""
