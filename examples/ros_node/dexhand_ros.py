@@ -187,7 +187,7 @@ class DexHandNode(ROSNode):
             [5] = error_code (0 if no error)
             [6] = impedance (float, lower values indicate higher resistance to movement)
             
-        Finger Mapping (self.fingertip_mapping, for tactile sensors only):
+        Finger Mapping (self.fingertip_mapping, for touch sensors only):
           th (thumb): index 0
           ff (index finger): index 1
           mf (middle finger): index 2

@@ -1200,14 +1200,14 @@ class DexHandBase:
         Returns:
             Tuple of (finger_name, touch_feedback) or None if no touch data
         """
-        if state.feedback is None or state.feedback.tactile is None:
+        if state.feedback is None or state.feedback.touch is None:
             return None
             
         if board_idx not in self.finger_map:
             return None
             
         timestamp_feedback = time.time_ns()
-        touch_data = state.feedback.tactile
+        touch_data = state.feedback.touch
         finger_name = self.finger_map[board_idx]
         
         touch_feedback = StampedTouchFeedback(
@@ -1224,7 +1224,7 @@ class DexHandBase:
         return finger_name, touch_feedback
             
     def get_feedback(self) -> HandFeedback:
-        """Get feedback from all joints and tactile sensors
+        """Get feedback from all joints and touch sensors
 
         Returns:
             HandFeedback object.

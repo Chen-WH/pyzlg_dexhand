@@ -132,7 +132,7 @@ class TestMessageDecoding:
         struct.pack_into('<h', data, 12, 4500)   # 45.00 degrees
         struct.pack_into('<h', data, 14, -9000)  # -90.00 degrees
 
-        # Tactile data (bytes 16-41)
+        # Touch data (bytes 16-41)
         struct.pack_into('<f', data, 16, 1.5)    # Normal force (N)
         struct.pack_into('<I', data, 20, 100)    # Force delta
         struct.pack_into('<f', data, 24, 0.5)    # Tangential force (N)
@@ -166,15 +166,15 @@ class TestMessageDecoding:
         assert msg.feedback.motor2.position == -2000
         assert msg.feedback.motor2.angle == -90.0
 
-        # Verify tactile feedback
-        assert msg.feedback.tactile is not None
-        assert msg.feedback.tactile.normal_force == pytest.approx(1.5)
-        assert msg.feedback.tactile.normal_force_delta == 100
-        assert msg.feedback.tactile.tangential_force == pytest.approx(0.5)
-        assert msg.feedback.tactile.tangential_force_delta == 50
-        assert msg.feedback.tactile.direction == 180
-        assert msg.feedback.tactile.proximity == 500
-        assert msg.feedback.tactile.temperature == 25
+        # Verify touch feedback
+        assert msg.feedback.touch is not None
+        assert msg.feedback.touch.normal_force == pytest.approx(1.5)
+        assert msg.feedback.touch.normal_force_delta == 100
+        assert msg.feedback.touch.tangential_force == pytest.approx(0.5)
+        assert msg.feedback.touch.tangential_force_delta == 50
+        assert msg.feedback.touch.direction == 180
+        assert msg.feedback.touch.proximity == 500
+        assert msg.feedback.touch.temperature == 25
 
         # Verify encoder values
         assert msg.feedback.motor1.encoder_value == 2048

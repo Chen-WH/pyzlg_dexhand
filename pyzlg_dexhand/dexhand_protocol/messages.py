@@ -50,8 +50,8 @@ class MotorFeedback:
     impedance: Optional[float] = None     # Motor impedance reading (float value)
 
 @dataclass(frozen=True)
-class TactileFeedback:
-    """Feedback from tactile sensor"""
+class TouchFeedback:
+    """Feedback from touch sensor"""
     normal_force: float           # Normal force in N
     normal_force_delta: int       # Change in normal force (raw units)
     tangential_force: float       # Tangential force in N
@@ -67,7 +67,7 @@ class BoardFeedback:
     motor2: MotorFeedback
     position_sensor1: float  # First position sensor reading
     position_sensor2: float  # Second position sensor reading
-    tactile: Optional[TactileFeedback] = None
+    touch: Optional[TouchFeedback] = None
 
 @dataclass(frozen=True)
 class ErrorInfo:
@@ -164,7 +164,7 @@ def _decode_feedback(data: bytes) -> BoardFeedback:
         motor2 = MotorFeedback(current2, velocity2, position2, pos2)
 
         # Optional data
-        tactile = None
+        touch = None
         
         # Adaptively decode based on message length
         data_len = len(data)
@@ -216,11 +216,11 @@ def _decode_feedback(data: bytes) -> BoardFeedback:
                 impedance=motor2_impedance
             )
 
-        # Decode tactile sensor data if present
-        # Tactile data starts at index 16, need at least 42 bytes for complete tactile data
-        if data_len >= 42:  # Full tactile data available
+        # Decode touch sensor data if present
+        # Touch data starts at index 16, need at least 42 bytes for complete touch sensor data
+        if data_len >= 42:  # Full touch sensor data available
             try:
-                tactile = TactileFeedback(
+                touch = TouchFeedback(
                     normal_force=struct.unpack('<f', data[16:20])[0],
                     normal_force_delta=int.from_bytes(data[20:24], 'little'),
                     tangential_force=struct.unpack('<f', data[24:28])[0],
@@ -229,11 +229,11 @@ def _decode_feedback(data: bytes) -> BoardFeedback:
                     proximity=int.from_bytes(data[34:38], 'little'),
                     temperature=int.from_bytes(data[38:42], 'little'),
                 )
-                if np.isnan(tactile.normal_force) or np.isnan(tactile.tangential_force):
-                    logger.warning("Invalid tactile sensor data: normal/tangential force is NaN")
+                if np.isnan(touch.normal_force) or np.isnan(touch.tangential_force):
+                    logger.warning("Invalid touch sensor data: normal/tangential force is NaN")
             except Exception as e:
-                logger.warning(f"Failed to decode tactile data: {e}")
-                tactile = None
+                logger.warning(f"Failed to decode touch data: {e}")
+                touch = None
 
         # Create BoardFeedback instance with all available data
         return BoardFeedback(
@@ -241,7 +241,7 @@ def _decode_feedback(data: bytes) -> BoardFeedback:
             motor2=motor2,
             position_sensor1=pos1,
             position_sensor2=pos2,
-            tactile=tactile,
+            touch=touch,
         )
 
     except (struct.error, TypeError) as e:

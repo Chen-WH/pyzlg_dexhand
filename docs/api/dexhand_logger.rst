@@ -146,7 +146,7 @@ Feedback Log (JSONL)::
                 "encoder_position": 1000
             }
         },
-        "tactile": {
+        "touch": {
             "th": {
                 "timestamp": 1234567890.123,
                 "normal_force": 1.5,

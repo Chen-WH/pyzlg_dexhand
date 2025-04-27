@@ -45,7 +45,7 @@ class FeedbackLogEntry(LogEntry):
     """Log entry for hand feedback"""
 
     joints: Dict[str, JointFeedback]  # Joint name to feedback
-    tactile: Dict[str, StampedTouchFeedback]  # Fingertip name to touch sensor data
+    touch: Dict[str, StampedTouchFeedback]  # Fingertip name to touch sensor data
 
 
 class LogWriter(threading.Thread):
@@ -192,7 +192,7 @@ class DexHandLogger:
             hand=hand,
             entry_type="feedback",
             joints=feedback.joints,
-            tactile=feedback.touch,
+            touch=feedback.touch,
         )
 
         # Add to buffer thread-safely
@@ -289,29 +289,29 @@ class DexHandLogger:
             if save:
                 plt.savefig(self.session_dir / f"{hand}_joints.png")
 
-            # Plot tactile feedback
-            if any(entry.tactile for entry in feedback_buffers[hand]):
+            # Plot touch feedback
+            if any(entry.touch for entry in feedback_buffers[hand]):
                 plt.figure(figsize=(12, 8))
-                tactile_data = {}
+                touch_data = {}
 
-                # Collect tactile data
+                # Collect touch data
                 for entry in feedback_buffers[hand]:
                     t = entry.timestamp
-                    for finger, data in entry.tactile.items():
-                        if finger not in tactile_data:
-                            tactile_data[finger] = {
+                    for finger, data in entry.touch.items():
+                        if finger not in touch_data:
+                            touch_data[finger] = {
                                 "times": [],
                                 "normal_force": [],
                                 "tangential_force": [],
                             }
-                        tactile_data[finger]["times"].append(t)
-                        tactile_data[finger]["normal_force"].append(data.normal_force)
-                        tactile_data[finger]["tangential_force"].append(
+                        touch_data[finger]["times"].append(t)
+                        touch_data[finger]["normal_force"].append(data.normal_force)
+                        touch_data[finger]["tangential_force"].append(
                             data.tangential_force
                         )
 
-                # Plot each finger's tactile data
-                for finger, data in tactile_data.items():
+                # Plot each finger's touch data
+                for finger, data in touch_data.items():
                     plt.plot(
                         data["times"],
                         data["normal_force"],
@@ -327,12 +327,12 @@ class DexHandLogger:
 
                 plt.xlabel("Time (s)")
                 plt.ylabel("Force (N)")
-                plt.title(f"{hand.title()} Hand Tactile Feedback")
+                plt.title(f"{hand.title()} Hand Touch Feedback")
                 plt.legend()
                 plt.grid(True)
 
                 if save:
-                    plt.savefig(self.session_dir / f"{hand}_tactile.png")
+                    plt.savefig(self.session_dir / f"{hand}_touch.png")
 
             plt.close("all")
 

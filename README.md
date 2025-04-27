@@ -265,7 +265,7 @@ logger.plot_session(show=True, save=True)
 Logs include:
 
 - Joint commands and feedback
-- Tactile sensor data
+- Touch sensor data
 - Error states
 - Timing information
 

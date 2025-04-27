@@ -20,7 +20,7 @@ from pyzlg_dexhand.dexhand_protocol.commands import (
     ControlMode, CommandType, FeedbackMode
 )
 from pyzlg_dexhand.dexhand_protocol.messages import (
-    BoardFeedback, MotorFeedback, TactileFeedback as TouchFeedback, ErrorInfo, ProcessedMessage, BoardError
+    BoardFeedback, MotorFeedback, TouchFeedback, ErrorInfo, ProcessedMessage, BoardError
 )
 
 from pyzlg_dexhand.dexhand_logger import DexHandLogger

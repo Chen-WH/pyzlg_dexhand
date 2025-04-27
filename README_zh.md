@@ -189,7 +189,7 @@ hand.move_joints(
 # 获取反馈
 feedback = hand.get_feedback()
 print(f"拇指角度: {feedback.joints['th_rot'].angle}")
-print(f"触觉力: {feedback.tactile['th'].normal_force}")
+print(f"触觉力: {feedback.touch['th'].normal_force}")
 ```
 
 注意：

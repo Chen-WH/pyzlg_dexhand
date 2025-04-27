@@ -140,9 +140,9 @@ Interface
 +---------------------------+---------------------------+----------+--------------------------------+
 | /right_hand_joint_states  | sensor_msgs/JointState    | Output   | Right hand joint feedback      |
 +---------------------------+---------------------------+----------+--------------------------------+
-| /left_touch_sensors       | Float64MultiArray         | Output   | Left hand tactile sensor data  |
+| /left_touch_sensors       | Float64MultiArray         | Output   | Left hand touch sensor data    |
 +---------------------------+---------------------------+----------+--------------------------------+
-| /right_touch_sensors      | Float64MultiArray         | Output   | Right hand tactile sensor data |
+| /right_touch_sensors      | Float64MultiArray         | Output   | Right hand touch sensor data   |
 +---------------------------+---------------------------+----------+--------------------------------+
 | /left_motor_feedback      | Float64MultiArray         | Output   | Left hand detailed motor data  |
 +---------------------------+---------------------------+----------+--------------------------------+
