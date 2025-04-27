@@ -43,7 +43,7 @@ def create_mock_feedback(timestamp=1000.0):
         ),
         position_sensor1=45.0,
         position_sensor2=-90.0,
-        tactile=TouchFeedback(
+        touch=TouchFeedback(
             normal_force=1.5,
             normal_force_delta=100,
             tangential_force=0.5,

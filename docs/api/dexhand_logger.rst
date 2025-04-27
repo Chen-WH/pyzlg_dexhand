@@ -112,9 +112,9 @@ Each logging session creates a timestamped directory::
         ├── right_commands.jsonl
         ├── right_feedback.jsonl
         ├── left_joints.png
-        ├── left_tactile.png
+        ├── left_touch.png
         ├── right_joints.png
-        └── right_tactile.png
+        └── right_touch.png
 
 File Formats
 ^^^^^^^^^^
