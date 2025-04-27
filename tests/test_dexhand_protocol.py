@@ -35,7 +35,11 @@ class TestCommandEncoding:
             control_mode=commands.ControlMode.IMPEDANCE_GRASP,  # 0x77
             motor_enable=0x03,  # Both motors enabled
             motor1_pos=1000,    # Test positive value
-            motor2_pos=-2000    # Test negative value
+            motor2_pos=-2000,   # Test negative value
+            motor1_speed=10000,  # Speed value
+            motor2_speed=12000,  # Speed value
+            motor1_current=100,  # Current value
+            motor2_current=200   # Current value
         )
         msg_type, data = commands.encode_command(cmd)
 
@@ -87,7 +91,11 @@ class TestCommandEncoding:
                 control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x03,
                 motor1_pos=32768,  # Just over limit
-                motor2_pos=0
+                motor2_pos=0,
+                motor1_speed=10000,
+                motor2_speed=10000,
+                motor1_current=100,
+                motor2_current=100
             )
             commands.encode_command(cmd)
 
@@ -96,7 +104,11 @@ class TestCommandEncoding:
                 control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x03,
                 motor1_pos=0,
-                motor2_pos=-32769  # Just under limit
+                motor2_pos=-32769,  # Just under limit
+                motor1_speed=10000,
+                motor2_speed=10000,
+                motor1_current=100,
+                motor2_current=100
             )
             commands.encode_command(cmd)
 
@@ -106,7 +118,11 @@ class TestCommandEncoding:
                 control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x04,  # Invalid flag
                 motor1_pos=0,
-                motor2_pos=0
+                motor2_pos=0,
+                motor1_speed=10000,
+                motor2_speed=10000,
+                motor1_current=100,
+                motor2_current=100
             )
             commands.encode_command(cmd)
 
@@ -279,7 +295,11 @@ class TestResponseVerification:
             control_mode=commands.ControlMode.IMPEDANCE_GRASP,
             motor_enable=0x03,
             motor1_pos=0,
-            motor2_pos=0
+            motor2_pos=0,
+            motor1_speed=10000,
+            motor2_speed=10000,
+            motor1_current=100,
+            motor2_current=100
         )
         # Motor commands should never verify responses
         message_type, encoded_data = commands.encode_command(cmd)

@@ -156,7 +156,7 @@ class TestCommandExecution:
                 control_mode=ControlMode.IMPEDANCE_GRASP
             )
 
-            assert True if result==None else False
+            assert result is True
 
 
     def test_error_handling(self, mock_hand):
@@ -178,14 +178,14 @@ class TestCommandExecution:
 
             result = mock_hand.move_joints(th_rot=30.0)
 
-            assert result == None
+            assert result is True
 
     def test_communication_failure(self, mock_hand):
         """Test handling of communication failures"""
         mock_hand.zcan.send_fd_message.return_value = False
 
         result = mock_hand.move_joints(th_rot=30.0)
-        assert result == None
+        assert result is False
 
 class TestJointControl:
     """Test joint control functionality"""
@@ -222,7 +222,7 @@ class TestJointControl:
                 feedback=mock_feedback
             )
             result = mock_hand.reset_joints()
-            assert result == None
+            assert result is True
 
     def test_get_feedback(self, mock_hand):
         """Test feedback collection without motion"""
@@ -300,27 +300,13 @@ class TestNewCommands:
             assert mock_hand.set_safe_temperature(55)
             expected_data = 55 .to_bytes(1, 'little')
             expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_SAFE_TEMPERATURE]) + expected_data
-            mock_send_command.assert_called_once_with(expected_command)
+            mock_send_command.assert_called_once_with(expected_command, None)
         # Test invalid temperature
         with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
             assert not mock_hand.set_safe_temperature(256)
             mock_send_command.assert_not_called()
 
-    def test_current_motor_control_torque(self, mock_hand):
-        """Test setting motor control torque"""
-        
-        # Test valid motor type and torque
-        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
-            assert mock_hand.current_motor_control_torque("motor1", 300)
-            expected_data = 300 .to_bytes(2, 'little')
-            expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_MOTOR1_TORQUE]) + expected_data
-            mock_send_command.assert_called_once_with(expected_command)
-
-        # Test invalid motor type
-
-        with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
-            assert not mock_hand.current_motor_control_torque("invalid_motor", 100)
-            mock_send_command.assert_not_called()
+    # Test for current_motor_control_torque removed as the method has been deprecated
 
     def test_set_stall_time(self, mock_hand):
         """Test setting stall time"""
@@ -329,7 +315,7 @@ class TestNewCommands:
             assert mock_hand.set_stall_time("motor1", 1000)
             expected_data = 1000 .to_bytes(2, 'little')
             expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_STALL_TIME_MOTOR1]) + expected_data
-            mock_send_command.assert_called_once_with(expected_command)
+            mock_send_command.assert_called_once_with(expected_command, None)
 
         # Test invalid stall time
         with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
@@ -344,7 +330,7 @@ class TestNewCommands:
             assert mock_hand.set_pressure_limit_value(20)
             expected_data = 2000 .to_bytes(2, 'little')
             expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_VALUE]) + expected_data
-            mock_send_command.assert_called_once_with(expected_command)
+            mock_send_command.assert_called_once_with(expected_command, None)
 
         # Test invalid pressure limit value
         with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
@@ -358,7 +344,7 @@ class TestNewCommands:
             assert mock_hand.set_pressure_limit_enable(True)
             expected_data = 1 .to_bytes(1, 'little')
             expected_command = bytes([MessageType.COMMAND_WRITE, FlashStorageTable.MEMORY_ADDRESS_PRESSURE_LIMIT_ENABLE]) + expected_data
-            mock_send_command.assert_called_once_with(expected_command)
+            mock_send_command.assert_called_once_with(expected_command, None)
 
         # Test invalid pressure limit enable
         with patch('pyzlg_dexhand.dexhand_interface.DexHandBase._send_command') as mock_send_command:
@@ -380,7 +366,7 @@ class TestNewCommands:
             
             # Reset the mock and call another method with a different log level
             mock_logger.reset_mock()
-            mock_hand.current_motor_control_torque("motor1", 300, log_level=LogLevel.INFO)
+            mock_hand.set_safe_temperature(55, log_level=LogLevel.INFO)
             mock_logger.debug.assert_called()  # DEBUG should also be called
         
         # Test scenario 2: Global log level INFO + Method log level DEBUG
@@ -397,7 +383,7 @@ class TestNewCommands:
             
             # Reset and test another method
             mock_logger.reset_mock()
-            mock_hand.current_motor_control_torque("motor1", 300, log_level=LogLevel.DEBUG)
+            mock_hand.set_safe_temperature(55, log_level=LogLevel.DEBUG)
             mock_logger.info.assert_not_called()
             mock_logger.debug.assert_called()
         

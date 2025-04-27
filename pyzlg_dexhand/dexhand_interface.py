@@ -125,6 +125,7 @@ class HandFeedback:
 class DexHandBase:
     """Base class for dexterous hand control"""
     # Constants are now imported from dexhand_protocol.constants
+    NUM_MOTORS = NUM_MOTORS  # Make NUM_MOTORS accessible as class attribute
 
     joint_names = [
         "th_dip",
@@ -1383,6 +1384,7 @@ def _load_hand_config(hand_type: str) -> dict:
 
 class LeftDexHand(DexHandBase):
     """Control interface for left dexterous hand"""
+    NUM_BOARDS = NUM_BOARDS
 
     def __init__(self, 
                  zcan: Optional[ZCANWrapper] = None, 
@@ -1409,6 +1411,7 @@ class LeftDexHand(DexHandBase):
 
 class RightDexHand(DexHandBase):
     """Control interface for right dexterous hand"""
+    NUM_BOARDS = NUM_BOARDS
 
     def __init__(self, 
                  zcan: Optional[ZCANWrapper] = None, 
