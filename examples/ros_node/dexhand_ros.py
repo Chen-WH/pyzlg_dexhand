@@ -364,6 +364,8 @@ class DexHandNode(ROSNode):
                 command = self.last_commands.get(hand, {})
 
                 # Use move_joints interface with broadcast option if enabled
+                # We combine clear_errors with move_joints by setting clear_error=True
+                # This avoids the separate clear_errors call which has issues with broadcast mode
                 hand_interface.move_joints(
                     th_dip=command.get("th_dip"),
                     th_mcp=command.get("th_mcp"),
@@ -379,10 +381,11 @@ class DexHandNode(ROSNode):
                     lf_mcp=command.get("lf_mcp"),
                     control_mode=self.control_mode,
                     use_broadcast=self.use_broadcast,
+                    clear_error=True,  # Combine clear_errors with move_joints
                 )
 
-                # Use the unified error clearing API with broadcast mode when enabled
-                hand_interface.clear_errors(use_broadcast=self.use_broadcast)
+                # Note: We no longer need a separate call to clear_errors
+                # The clear_error=True flag above handles this more efficiently
 
                 # Get and publish feedback if enabled
                 if self.enable_feedback:
@@ -524,8 +527,9 @@ class DexHandNode(ROSNode):
                     lf_dip=30,
                     lf_mcp=30,
                     use_broadcast=self.use_broadcast,
+                    clear_error=True  # Combined with move_joints
                 )
-                hand.clear_errors(use_broadcast=self.use_broadcast)
+                # No separate clear_errors call needed
 
             # Wait a moment
             time.sleep(0.5)
@@ -533,10 +537,12 @@ class DexHandNode(ROSNode):
             # Then straighten to 0 degrees
             for _ in range(2):
                 for hand in self.hands.values():
+                    # Reset joints to 0 degrees with clear_error flag
                     hand.reset_joints(use_broadcast=self.use_broadcast)
                     time.sleep(0.005)
                     
-                    hand.clear_errors(use_broadcast=self.use_broadcast)
+                    # Clear errors separately with broadcast=False to ensure it works properly
+                    hand.clear_errors(use_broadcast=False)
                         
                     time.sleep(0.005)
 

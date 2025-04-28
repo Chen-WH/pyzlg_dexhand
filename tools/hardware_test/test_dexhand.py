@@ -264,7 +264,7 @@ class DexHandTester:
                 for name, hand in self.hands.items():
                     hand.move_joints(**{joint_name: max_angle})
                     feedback = hand.get_feedback()
-                    hand.clear_errors(clear_all=True)
+                    hand.clear_errors(clear_all=True, use_broadcast=False)
                     self.logger.log_command(
                         "move_joint",
                         {joint_name: max_angle},
@@ -295,7 +295,7 @@ class DexHandTester:
                 for name, hand in self.hands.items():
                     hand.move_joints(**{joint_name: 0.0})
                     feedback = hand.get_feedback()
-                    hand.clear_errors(clear_all=True)
+                    hand.clear_errors(clear_all=True, use_broadcast=False)
                     self.logger.log_command(
                         "move_joint",
                         {joint_name: 0.0},
@@ -341,7 +341,7 @@ class DexHandTester:
             for name, hand in self.hands.items():
                 hand.move_joints(**joint_commands)
                 feedback = hand.get_feedback()
-                hand.clear_errors(clear_all=True)
+                hand.clear_errors(clear_all=True, use_broadcast=False)
                 self.logger.log_command(
                     "simultaneous",
                     joint_commands,
@@ -383,7 +383,7 @@ class DexHandTester:
             for name, hand in self.hands.items():
                 hand.move_joints(**zero_commands)
                 feedback = hand.get_feedback()
-                hand.clear_errors(clear_all=True)
+                hand.clear_errors(clear_all=True, use_broadcast=False)
                 self.logger.log_command(
                     "simultaneous",
                     zero_commands,
@@ -449,7 +449,7 @@ class DexHandTester:
             for name, hand in self.hands.items():
                 # Time command sending
                 cmd_start = time.perf_counter()
-                hand.clear_errors(clear_all=True)
+                hand.clear_errors(clear_all=True, use_broadcast=False)
                 hand.move_joints(**joint_commands)
                 cmd_end = time.perf_counter()
                 command_times.append(cmd_end - cmd_start)
@@ -517,7 +517,7 @@ class DexHandTester:
             for name, hand in self.hands.items():
                 # Time command sending
                 cmd_start = time.perf_counter()
-                hand.clear_errors(clear_all=True)
+                hand.clear_errors(clear_all=True, use_broadcast=False)
                 hand.move_joints(**joint_commands)
                 cmd_end = time.perf_counter()
                 command_times.append(cmd_end - cmd_start)

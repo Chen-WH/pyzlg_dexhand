@@ -160,7 +160,7 @@ def main():
         f"    {args.hands[i]}_hand.get_feedback()           # Get current joint and touch feedback"
     )
     print(
-        f"    {args.hands[i]}_hand.clear_errors()           # Clear any error states"
+        f"    {args.hands[i]}_hand.clear_errors(use_broadcast=False)  # Clear any error states (use_broadcast=False to avoid a known bug)"
     )
 
     embed(user_ns=globals_dict)

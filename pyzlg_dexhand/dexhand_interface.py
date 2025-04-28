@@ -1264,13 +1264,17 @@ class DexHandBase:
         """
         return {i: state.error_info for i, state in self.board_states.items()}
 
-    def clear_errors(self, clear_all=True, use_broadcast=True, log_level: Optional[LogLevel] = None) -> bool:
+    def clear_errors(self, clear_all=True, use_broadcast=False, log_level: Optional[LogLevel] = None) -> bool:
         """Clear errors for the hand
+        
+        NOTE: KNOWN BUG: The broadcast mode for clearing errors is not functioning correctly 
+              in this version. Always set use_broadcast=False or leave at default.
+              This will be fixed in a future release.
         
         Args:
             clear_all: If True, attempt to clear errors for all boards even if not in error state
-            use_broadcast: If True, use more efficient broadcast command to clear all errors at once
-                          with a single CAN message (recommended)
+            use_broadcast: DEPRECATED - use_broadcast=True will not work correctly in this version
+                          and will be fixed in a future release. Set to False or leave as default.
             log_level: Optional logging level for the operation
             
         Returns:
@@ -1278,10 +1282,14 @@ class DexHandBase:
         """
         # Use the more efficient broadcast command when clearing all errors
         if clear_all and use_broadcast:
-            # Broadcast clear_error command affects all boards simultaneously with one message
-            return self.send_global_command(GlobalFunctionCode.CLEAR_ERROR, log_level=log_level)
+            # BUGGY: This implementation does not work correctly
+            # Will be fixed in a future release
+            logger.warning("WARNING: clear_errors called with use_broadcast=True, which has a known bug. "
+                          "Using per-board clear instead. Set use_broadcast=False or leave at default.")
+            # Force use_broadcast to False to use the working implementation
+            use_broadcast = False
         
-        # Fall back to individual commands for selective clearing
+        # Use individual commands for clearing (the reliable method)
         success = True
         for board_idx in range(NUM_BOARDS):
             if clear_all or not self.board_states[board_idx].is_normal:
