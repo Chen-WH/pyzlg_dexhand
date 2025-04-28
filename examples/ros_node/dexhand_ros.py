@@ -364,8 +364,9 @@ class DexHandNode(ROSNode):
                 command = self.last_commands.get(hand, {})
 
                 # Use move_joints interface with broadcast option if enabled
-                # We combine clear_errors with move_joints by setting clear_error=True
-                # This avoids the separate clear_errors call which has issues with broadcast mode
+                # If using broadcast mode, we need to separately clear errors
+                # If not using broadcast mode, we can combine with move_joints
+                # This avoids the problematic combination of clear_error=True with use_broadcast=True
                 hand_interface.move_joints(
                     th_dip=command.get("th_dip"),
                     th_mcp=command.get("th_mcp"),
@@ -381,11 +382,15 @@ class DexHandNode(ROSNode):
                     lf_mcp=command.get("lf_mcp"),
                     control_mode=self.control_mode,
                     use_broadcast=self.use_broadcast,
-                    clear_error=True,  # Combine clear_errors with move_joints
+                    clear_error=not self.use_broadcast,  # Only clear errors with non-broadcast mode
                 )
+                
+                # If using broadcast mode, clear errors separately
+                if self.use_broadcast:
+                    hand_interface.clear_errors(use_broadcast=False)
 
-                # Note: We no longer need a separate call to clear_errors
-                # The clear_error=True flag above handles this more efficiently
+                # Note: We've updated the approach to avoid the problematic combination of
+                # clear_error=True with use_broadcast=True
 
                 # Get and publish feedback if enabled
                 if self.enable_feedback:
@@ -527,9 +532,12 @@ class DexHandNode(ROSNode):
                     lf_dip=30,
                     lf_mcp=30,
                     use_broadcast=self.use_broadcast,
-                    clear_error=True  # Combined with move_joints
+                    clear_error=not self.use_broadcast  # Only clear errors with non-broadcast mode
                 )
-                # No separate clear_errors call needed
+                
+                # If using broadcast mode, clear errors separately
+                if self.use_broadcast:
+                    hand.clear_errors(use_broadcast=False)
 
             # Wait a moment
             time.sleep(0.5)

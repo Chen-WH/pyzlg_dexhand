@@ -1091,6 +1091,11 @@ class DexHandBase:
             control_mode: Motor control mode
             use_broadcast: If True, send a single broadcast command for all joints (more efficient, default: True)
             clear_error: Whether to clear errors (only for broadcast mode)
+                        NOTE: KNOWN BUG: The combination of clear_error=True with use_broadcast=True 
+                        is not functioning correctly in this version. 
+                        If you need to clear errors, use either:
+                        1. move_joints(..., clear_error=True, use_broadcast=False)
+                        2. clear_errors(use_broadcast=False) followed by move_joints(...)
             request_feedback: Whether to request feedback (only for broadcast mode)
             log_level: Logging level for this operation
             
@@ -1108,6 +1113,15 @@ class DexHandBase:
                 mf_dip=JointCommand(position=20, velocity=5000)  # Position and velocity, default current
             )
         """
+        # Warn about the problematic combination of clear_error=True with use_broadcast=True
+        if clear_error and use_broadcast:
+            logger.warning("WARNING: move_joints called with clear_error=True and use_broadcast=True, "
+                         "which has a known bug. Setting clear_error=False. "
+                         "To clear errors, either use clear_error=True with use_broadcast=False, "
+                         "or call clear_errors(use_broadcast=False) separately.")
+            # Force clear_error to False to avoid the buggy behavior
+            clear_error = False
+        
         # Prepare all joint commands
         enable_motors, scaled_positions, motor_speeds, motor_currents = self._prepare_joint_commands(
             th_rot=th_rot, th_mcp=th_mcp, th_dip=th_dip,
@@ -1124,7 +1138,7 @@ class DexHandBase:
             is_right_hand = isinstance(self, RightDexHand)
             
             # Send the broadcast command
-            return self.send_broadcast_command(
+            result = self.send_broadcast_command(
                 control_mode=control_mode,
                 enable_motors=enable_motors,
                 positions=scaled_positions,
@@ -1135,9 +1149,11 @@ class DexHandBase:
                 is_right_hand=is_right_hand,
                 log_level=log_level
             )
+            
+            return result
         else:
             # Use traditional per-board commands
-            return self._send_per_board_commands(
+            result = self._send_per_board_commands(
                 enable_motors=enable_motors,
                 scaled_positions=scaled_positions,
                 motor_speeds=motor_speeds,
@@ -1145,6 +1161,13 @@ class DexHandBase:
                 control_mode=control_mode,
                 log_level=log_level
             )
+            
+            # Also clear errors if requested with non-broadcast mode
+            if result and clear_error:
+                # Call clear_errors with use_broadcast=False to use individual board commands
+                return self.clear_errors(clear_all=True, use_broadcast=False, log_level=log_level)
+            
+            return result
             
     def _process_joint_feedback(self, board_idx: int, state: BoardState) -> Dict[str, JointFeedback]:
         """Process feedback for joints on a specific board
