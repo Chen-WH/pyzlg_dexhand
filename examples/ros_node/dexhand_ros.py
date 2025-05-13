@@ -122,16 +122,16 @@ class DexHandNode(ROSNode):
         # Topic configuration
         self.topic_config = {
             "left": {
-                "command": config.get("left_hand_command_topic", "/left_hand_joint_commands"),
-                "joint_feedback": config.get("left_hand_joint_feedback_topic", "/left_hand_joint_states"),
-                "touch_feedback": config.get("left_touch_feedback_topic", "/left_touch_sensors"),
-                "motor_feedback": config.get("left_motor_feedback_topic", "/left_motor_feedback")
+                "command": config.get("left_hand_command_topic", "/left_hand/joint_commands"),
+                "joint_feedback": config.get("left_hand_joint_feedback_topic", "/left_hand/joint_states"),
+                "touch_feedback": config.get("left_touch_feedback_topic", "/left_hand/touch_sensors"),
+                "motor_feedback": config.get("left_motor_feedback_topic", "/left_hand/motor_feedback")
             },
             "right": {
-                "command": config.get("right_hand_command_topic", "/right_hand_joint_commands"),
-                "joint_feedback": config.get("right_hand_joint_feedback_topic", "/right_hand_joint_states"),
-                "touch_feedback": config.get("right_touch_feedback_topic", "/right_touch_sensors"),
-                "motor_feedback": config.get("right_motor_feedback_topic", "/right_motor_feedback")
+                "command": config.get("right_hand_command_topic", "/right_hand/joint_commands"),
+                "joint_feedback": config.get("right_hand_joint_feedback_topic", "/right_hand/joint_states"),
+                "touch_feedback": config.get("right_touch_feedback_topic", "/right_hand/touch_sensors"),
+                "motor_feedback": config.get("right_motor_feedback_topic", "/right_hand/motor_feedback")
             }
         }
 

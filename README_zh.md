@@ -132,14 +132,14 @@ python examples/ros_node/continuous_joint_publisher.py --pattern sine --amplitud
 
 | 话题（默认）              | 类型                     | 方向 | 描述                     |
 | ------------------------- | ------------------------ | ---- | ------------------------ |
-| `/left_hand_joint_commands` | `sensor_msgs/JointState` | 输入 | 左手关节位置命令          |
-| `/right_hand_joint_commands`| `sensor_msgs/JointState` | 输入 | 右手关节位置命令          |
-| `/left_hand_joint_states`   | `sensor_msgs/JointState` | 输出 | 左手关节位置反馈          |
-| `/right_hand_joint_states`  | `sensor_msgs/JointState` | 输出 | 右手关节位置反馈          |
-| `/left_touch_sensors`       | `Float64MultiArray`      | 输出 | 左手触觉传感器数据        |
-| `/right_touch_sensors`      | `Float64MultiArray`      | 输出 | 右手触觉传感器数据        |
-| `/left_motor_feedback`      | `Float64MultiArray`      | 输出 | 左手详细电机数据          |
-| `/right_motor_feedback`     | `Float64MultiArray`      | 输出 | 右手详细电机数据          |
+| `/left_hand/joint_commands` | `sensor_msgs/JointState` | 输入 | 左手关节位置命令          |
+| `/right_hand/joint_commands`| `sensor_msgs/JointState` | 输入 | 右手关节位置命令          |
+| `/left_hand/joint_states`   | `sensor_msgs/JointState` | 输出 | 左手关节位置反馈          |
+| `/right_hand/joint_states`  | `sensor_msgs/JointState` | 输出 | 右手关节位置反馈          |
+| `/left_hand/touch_sensors`       | `Float64MultiArray`      | 输出 | 左手触觉传感器数据        |
+| `/right_hand/touch_sensors`      | `Float64MultiArray`      | 输出 | 右手触觉传感器数据        |
+| `/left_hand/motor_feedback`      | `Float64MultiArray`      | 输出 | 左手详细电机数据          |
+| `/right_hand/motor_feedback`     | `Float64MultiArray`      | 输出 | 右手详细电机数据          |
 
 话题名称可通过 `config/config.yaml` 配置。
 

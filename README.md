@@ -132,14 +132,14 @@ Interface:
 
 | Topic (default)            | Type                     | Direction | Description                    |
 | -------------------------- | ------------------------ | --------- | ------------------------------ |
-| `/left_hand_joint_commands`| `sensor_msgs/JointState` | Input     | Left hand joint commands       |
-| `/right_hand_joint_commands`| `sensor_msgs/JointState`| Input     | Right hand joint commands      |
-| `/left_hand_joint_states`  | `sensor_msgs/JointState` | Output    | Left hand joint feedback       |
-| `/right_hand_joint_states` | `sensor_msgs/JointState` | Output    | Right hand joint feedback      |
-| `/left_touch_sensors`      | `Float64MultiArray`      | Output    | Left hand touch sensor data  |
-| `/right_touch_sensors`     | `Float64MultiArray`      | Output    | Right hand touch sensor data |
-| `/left_motor_feedback`     | `Float64MultiArray`      | Output    | Left hand detailed motor data  |
-| `/right_motor_feedback`    | `Float64MultiArray`      | Output    | Right hand detailed motor data |
+| `/left_hand/joint_commands`| `sensor_msgs/JointState` | Input     | Left hand joint commands       |
+| `/right_hand/joint_commands`| `sensor_msgs/JointState`| Input     | Right hand joint commands      |
+| `/left_hand/joint_states`  | `sensor_msgs/JointState` | Output    | Left hand joint feedback       |
+| `/right_hand/joint_states` | `sensor_msgs/JointState` | Output    | Right hand joint feedback      |
+| `/left_hand/touch_sensors`      | `Float64MultiArray`      | Output    | Left hand touch sensor data  |
+| `/right_hand/touch_sensors`     | `Float64MultiArray`      | Output    | Right hand touch sensor data |
+| `/left_hand/motor_feedback`     | `Float64MultiArray`      | Output    | Left hand detailed motor data  |
+| `/right_hand/motor_feedback`    | `Float64MultiArray`      | Output    | Right hand detailed motor data |
 
 Topic names configurable via `config/config.yaml`.
 
