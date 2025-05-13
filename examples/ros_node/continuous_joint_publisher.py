@@ -175,7 +175,7 @@ class DexHandContinuousPublisher(ROSNode):
         """
         Call the reset_hands service to reset the hand to a known state.
         """
-        reset_client = self.create_client(Trigger, "/dexhand/reset_hands")
+        reset_client = self.create_client(Trigger, "/reset_hands")
         if reset_client.wait_for_service(timeout_sec=1.0):
             request = Trigger.Request()
             result = reset_client.call(request)

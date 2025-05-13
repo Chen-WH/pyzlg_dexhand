@@ -305,7 +305,14 @@ class DexHandNode(ROSNode):
                 )
 
         # Initialize reset service
-        self.create_service(Trigger, "dexhand/reset_hands", self.reset_callback)
+        self.create_service(Trigger, "/reset_hands", self.reset_callback)
+        
+        reset_client = self.create_client(Trigger, "/reset_hands")
+        if reset_client.wait_for_service(timeout_sec=1.0):
+            request = Trigger.Request()
+            reset_client.call_async(request)
+        else:
+            self.logger.warn("Reset service not available")
 
         # Set up command sending timer
         period = 1.0 / send_rate
