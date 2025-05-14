@@ -554,12 +554,12 @@ class DexHandNode(ROSNode):
                 for hand in self.hands.values():
                     # Reset joints to 0 degrees with clear_error flag
                     hand.reset_joints(use_broadcast=self.use_broadcast)
-                    time.sleep(0.005)
+                    time.sleep(0.2)
                     
                     # Clear errors separately with broadcast=False to ensure it works properly
                     hand.clear_errors(use_broadcast=False)
                         
-                    time.sleep(0.005)
+                    time.sleep(0.2)
 
             # Clear command history
             for hand in self.hands:
