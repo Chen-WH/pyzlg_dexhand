@@ -100,6 +100,26 @@ class DexHandTester:
             self.hands[name] = hand_class(self.zcan)
             if not self.hands[name].init():
                 raise RuntimeError(f"Failed to initialize {name} hand")
+                
+            # Check firmware version
+            versions = self.hands[name].get_firmware_versions()
+            if versions:
+                # Print firmware versions for this hand
+                for joint, version in versions.items():
+                    if version is not None:
+                        logger.info(f"{name} hand joint {joint} firmware version: {version}")
+                
+                # Get unique versions
+                unique_versions = set(v for v in versions.values() if v is not None)
+                if len(unique_versions) > 1:
+                    logger.error(f"{name} hand has mismatched firmware versions: {unique_versions}")
+                    raise RuntimeError(f"{name} hand has mismatched firmware versions")
+                elif len(unique_versions) == 0:
+                    logger.error(f"Could not read firmware versions for {name} hand")
+                    raise RuntimeError(f"Could not read firmware versions for {name} hand")
+                else:
+                    logger.info(f"{name} hand firmware version: {list(unique_versions)[0]}")
+            
             logger.info(f"Initialized {name} hand")
 
         # Create results directory
@@ -207,7 +227,7 @@ class DexHandTester:
             self.logger.log_command(
                 "reset_joints",
                 {joint: 0.0 for joint in JOINT_CONFIGS},
-                ControlMode.CASCADED_PID,
+                ControlMode.IMPEDANCE_GRASP,
                 name,
                 feedback,
             )
@@ -244,11 +264,11 @@ class DexHandTester:
                 for name, hand in self.hands.items():
                     hand.move_joints(**{joint_name: max_angle})
                     feedback = hand.get_feedback()
-                    hand.clear_errors(clear_all=True)
+                    hand.clear_errors(clear_all=True, use_broadcast=False)
                     self.logger.log_command(
                         "move_joint",
                         {joint_name: max_angle},
-                        ControlMode.CASCADED_PID,
+                        ControlMode.IMPEDANCE_GRASP,
                         name,
                         feedback,
                     )
@@ -275,11 +295,11 @@ class DexHandTester:
                 for name, hand in self.hands.items():
                     hand.move_joints(**{joint_name: 0.0})
                     feedback = hand.get_feedback()
-                    hand.clear_errors(clear_all=True)
+                    hand.clear_errors(clear_all=True, use_broadcast=False)
                     self.logger.log_command(
                         "move_joint",
                         {joint_name: 0.0},
-                        ControlMode.CASCADED_PID,
+                        ControlMode.IMPEDANCE_GRASP,
                         name,
                         feedback,
                     )
@@ -321,11 +341,11 @@ class DexHandTester:
             for name, hand in self.hands.items():
                 hand.move_joints(**joint_commands)
                 feedback = hand.get_feedback()
-                hand.clear_errors(clear_all=True)
+                hand.clear_errors(clear_all=True, use_broadcast=False)
                 self.logger.log_command(
                     "simultaneous",
                     joint_commands,
-                    ControlMode.CASCADED_PID,
+                    ControlMode.IMPEDANCE_GRASP,
                     name,
                     feedback,
                 )
@@ -363,11 +383,11 @@ class DexHandTester:
             for name, hand in self.hands.items():
                 hand.move_joints(**zero_commands)
                 feedback = hand.get_feedback()
-                hand.clear_errors(clear_all=True)
+                hand.clear_errors(clear_all=True, use_broadcast=False)
                 self.logger.log_command(
                     "simultaneous",
                     zero_commands,
-                    ControlMode.CASCADED_PID,
+                    ControlMode.IMPEDANCE_GRASP,
                     name,
                     feedback,
                 )
@@ -429,7 +449,7 @@ class DexHandTester:
             for name, hand in self.hands.items():
                 # Time command sending
                 cmd_start = time.perf_counter()
-                hand.clear_errors(clear_all=True)
+                hand.clear_errors(clear_all=True, use_broadcast=False)
                 hand.move_joints(**joint_commands)
                 cmd_end = time.perf_counter()
                 command_times.append(cmd_end - cmd_start)
@@ -443,7 +463,7 @@ class DexHandTester:
                 self.logger.log_command(
                     "consecutive",
                     joint_commands,
-                    ControlMode.CASCADED_PID,
+                    ControlMode.IMPEDANCE_GRASP,
                     name,
                     feedback,
                 )
@@ -497,7 +517,7 @@ class DexHandTester:
             for name, hand in self.hands.items():
                 # Time command sending
                 cmd_start = time.perf_counter()
-                hand.clear_errors(clear_all=True)
+                hand.clear_errors(clear_all=True, use_broadcast=False)
                 hand.move_joints(**joint_commands)
                 cmd_end = time.perf_counter()
                 command_times.append(cmd_end - cmd_start)
@@ -511,7 +531,7 @@ class DexHandTester:
                 self.logger.log_command(
                     "consecutive",
                     joint_commands,
-                    ControlMode.CASCADED_PID,
+                    ControlMode.IMPEDANCE_GRASP,
                     name,
                     feedback,
                 )

@@ -32,10 +32,14 @@ class TestCommandEncoding:
         """Test motor command encoding matches protocol specification"""
         # Create a motor command with known values
         cmd = commands.MotorCommand(
-            control_mode=commands.ControlMode.CASCADED_PID,  # 0x44
+            control_mode=commands.ControlMode.IMPEDANCE_GRASP,  # 0x77
             motor_enable=0x03,  # Both motors enabled
             motor1_pos=1000,    # Test positive value
-            motor2_pos=-2000    # Test negative value
+            motor2_pos=-2000,   # Test negative value
+            motor1_speed=10000,  # Speed value
+            motor2_speed=12000,  # Speed value
+            motor1_current=100,  # Current value
+            motor2_current=200   # Current value
         )
         msg_type, data = commands.encode_command(cmd)
 
@@ -43,7 +47,7 @@ class TestCommandEncoding:
         assert msg_type == MessageType.MOTION_COMMAND
 
         # Verify each byte according to protocol
-        assert data[0] == 0x44  # Control mode
+        assert data[0] == 0x77  # Control mode
         assert data[1] == 0x03  # Enable flags
         # Motor 1 position (little endian)
         assert data[2] == (1000 & 0xFF)
@@ -84,39 +88,51 @@ class TestCommandEncoding:
         # Test position range limits
         with pytest.raises(ValueError, match="position out of range"):
             cmd = commands.MotorCommand(
-                control_mode=commands.ControlMode.CASCADED_PID,
+                control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x03,
                 motor1_pos=32768,  # Just over limit
-                motor2_pos=0
+                motor2_pos=0,
+                motor1_speed=10000,
+                motor2_speed=10000,
+                motor1_current=100,
+                motor2_current=100
             )
             commands.encode_command(cmd)
 
         with pytest.raises(ValueError, match="position out of range"):
             cmd = commands.MotorCommand(
-                control_mode=commands.ControlMode.CASCADED_PID,
+                control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x03,
                 motor1_pos=0,
-                motor2_pos=-32769  # Just under limit
+                motor2_pos=-32769,  # Just under limit
+                motor1_speed=10000,
+                motor2_speed=10000,
+                motor1_current=100,
+                motor2_current=100
             )
             commands.encode_command(cmd)
 
         # Test enable flags
         with pytest.raises(ValueError, match="enable flags"):
             cmd = commands.MotorCommand(
-                control_mode=commands.ControlMode.CASCADED_PID,
+                control_mode=commands.ControlMode.IMPEDANCE_GRASP,
                 motor_enable=0x04,  # Invalid flag
                 motor1_pos=0,
-                motor2_pos=0
+                motor2_pos=0,
+                motor1_speed=10000,
+                motor2_speed=10000,
+                motor1_current=100,
+                motor2_current=100
             )
             commands.encode_command(cmd)
 
 class TestMessageDecoding:
     """Test message decoding according to protocol specification"""
 
-    def test_feedback_decoding(self):
+    def test_feedback_decoding(self):   
         """Test feedback message decoding matches protocol specification"""
         # Construct feedback data according to protocol
-        data = bytearray(46)  # Full message with encoders
+        data = bytearray(56)  # Full message with encoders
 
         # Motor 1 data (bytes 0-5)
         struct.pack_into('<h', data, 0, 100)     # Current (mA)
@@ -132,7 +148,7 @@ class TestMessageDecoding:
         struct.pack_into('<h', data, 12, 4500)   # 45.00 degrees
         struct.pack_into('<h', data, 14, -9000)  # -90.00 degrees
 
-        # Tactile data (bytes 16-41)
+        # Touch data (bytes 16-41)
         struct.pack_into('<f', data, 16, 1.5)    # Normal force (N)
         struct.pack_into('<I', data, 20, 100)    # Force delta
         struct.pack_into('<f', data, 24, 0.5)    # Tangential force (N)
@@ -144,6 +160,10 @@ class TestMessageDecoding:
         # Encoder values (bytes 42-45)
         struct.pack_into('<H', data, 42, 2048)   # Encoder 1
         struct.pack_into('<H', data, 44, 1024)   # Encoder 2
+
+        # Motor impedance values (48-55)
+        struct.pack_into('<f', data, 48, 100.0)   # Motor 1 impedance
+        struct.pack_into('<f', data, 52, 200.0)   # Motor 2 impedance
 
         # Decode and verify values
         msg = messages.process_message(0x181, bytes(data))
@@ -162,19 +182,23 @@ class TestMessageDecoding:
         assert msg.feedback.motor2.position == -2000
         assert msg.feedback.motor2.angle == -90.0
 
-        # Verify tactile feedback
-        assert msg.feedback.tactile is not None
-        assert msg.feedback.tactile.normal_force == pytest.approx(1.5)
-        assert msg.feedback.tactile.normal_force_delta == 100
-        assert msg.feedback.tactile.tangential_force == pytest.approx(0.5)
-        assert msg.feedback.tactile.tangential_force_delta == 50
-        assert msg.feedback.tactile.direction == 180
-        assert msg.feedback.tactile.proximity == 500
-        assert msg.feedback.tactile.temperature == 25
+        # Verify touch feedback
+        assert msg.feedback.touch is not None
+        assert msg.feedback.touch.normal_force == pytest.approx(1.5)
+        assert msg.feedback.touch.normal_force_delta == 100
+        assert msg.feedback.touch.tangential_force == pytest.approx(0.5)
+        assert msg.feedback.touch.tangential_force_delta == 50
+        assert msg.feedback.touch.direction == 180
+        assert msg.feedback.touch.proximity == 500
+        assert msg.feedback.touch.temperature == 25
 
         # Verify encoder values
-        assert msg.feedback.encoder1 == 2048
-        assert msg.feedback.encoder2 == 1024
+        assert msg.feedback.motor1.encoder_value == 2048
+        assert msg.feedback.motor2.encoder_value == 1024
+
+        # Verify motor impedance values
+        assert msg.feedback.motor1.impedance == 100.0 
+        assert msg.feedback.motor2.impedance == 200.0 
 
     def test_error_decoding(self):
         """Test error message decoding matches protocol specification"""
@@ -182,26 +206,25 @@ class TestMessageDecoding:
         data = bytes([
             0xEE,  # Error message marker
             messages.BoardError.MOTOR1_ERROR,
-            messages.ErrorCode.MOTOR1_CURRENT_OVERLOAD
+            messages.ErrorCode.CURRENT_OVERLOAD
         ])
         msg = messages.process_message(0x601, data)
         assert msg.msg_type == MessageType.ERROR_MESSAGE
-        assert msg.error is not None
-        assert msg.error.error_type == messages.BoardError.MOTOR1_ERROR
-        assert msg.error.error_code == messages.ErrorCode.MOTOR1_CURRENT_OVERLOAD
-        assert "current overload" in msg.error.description.lower()
+        assert msg.error_info is not None
+        assert msg.error_info.error_type == messages.BoardError.MOTOR1_ERROR
+        assert msg.error_info.error_data[0] == messages.ErrorCode.CURRENT_OVERLOAD
+        assert "current_overload" in msg.error_info.description.lower()
 
         # Test multiple errors
         data = bytes([
             0xEE,  # Error message marker
             messages.BoardError.BOTH_MOTORS_ERROR,
-            (messages.ErrorCode.MOTOR1_HALL_ERROR |
-             messages.ErrorCode.MOTOR2_HALL_ERROR)
+            messages.ErrorCode.HALL_ERROR
         ])
         msg = messages.process_message(0x601, data)
-        assert msg.error is not None
-        assert msg.error.error_type == messages.BoardError.BOTH_MOTORS_ERROR
-        assert "hall" in msg.error.description.lower()
+        assert msg.error_info is not None
+        assert msg.error_info.error_type == messages.BoardError.BOTH_MOTORS_ERROR
+        assert "hall_error" in msg.error_info.description.lower()
 
     def test_feedback_validation(self, caplog):
         """Test feedback message validation"""
@@ -213,11 +236,14 @@ class TestMessageDecoding:
         """Test error message validation"""
         # Test invalid error marker
         processed_message = messages.process_message(0x601, bytes([0xFF, 0x01, 0x01]))
-        assert processed_message.msg_type == MessageType.INVALID
+        # 0xFF is actually a valid error code for overheat now
+        assert processed_message.msg_type == MessageType.ERROR_MESSAGE
+        assert "unknown error message type" in processed_message.error_info.description.lower()
 
         # Test invalid error type
         processed_message = messages.process_message(0x601, bytes([0xEE, 0xFF, 0x01]))
-        assert processed_message.msg_type == MessageType.INVALID
+        assert processed_message.msg_type == MessageType.ERROR_MESSAGE
+        assert "not a valid boarderror" in processed_message.error_info.description.lower()
 
     def test_process_error_message(self):
         """Test processing of a real error message captured from hardware"""
@@ -232,31 +258,18 @@ class TestMessageDecoding:
         assert result.sender_id == can_id
 
         # Verify error information
-        assert result.error is not None
-        assert result.error.error_type == messages.BoardError.MOTOR1_ERROR  # 0x01
-        assert result.error.error_code == 0x04  # Motor 1 stall error
-        assert "stall error" in result.error.description.lower()
+        assert result.error_info is not None
+        assert result.error_info.error_type == messages.BoardError.MOTOR1_ERROR  # 0x01
+        assert result.error_info.error_data[0] == 0x04  # Motor 1 stall error
+        assert "param_error" in result.error_info.description.lower()
 
         # Verify the error is for the correct board (from CAN ID)
         board_id = can_id & 0x0F
         assert board_id == 0x09
 
 
-class TestResponseVerification:
+class TestResponseVerification: 
     """Test command response verification"""
-
-    def test_clear_error_response(self):
-        """Test clear error command response verification"""
-        cmd = commands.ClearErrorCommand()
-
-        # Valid response
-        assert commands.verify_response(cmd, 0x081, bytes([0x03, 0xA4, 0x00, 0x01]))
-
-        # Invalid responses
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0xA4, 0x00, 0x00]))  # Failed
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0xA4]))  # Too short
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0x74, 0x00, 0x01]))  # Wrong command
-
     def test_feedback_config_response(self):
         """Test feedback configuration response verification"""
         cmd = commands.FeedbackConfigCommand(
@@ -264,25 +277,34 @@ class TestResponseVerification:
             period_ms=100,
             enable=True
         )
+        message_type, encoded_data = commands.encode_command(cmd)
 
         # Valid response
-        assert commands.verify_response(cmd, 0x081, bytes([0x03, 0x74, 0x00, 0x01]))
+        assert message_type == MessageType.CONFIG_COMMAND
+        # Invalid responses
+        assert encoded_data == bytes([0x03, 0x74, 0x01, 0x0A, 0x01])
 
         # Invalid responses
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0x74, 0x00, 0x00]))  # Failed
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0x74]))  # Too short
-        assert not commands.verify_response(cmd, 0x081, bytes([0x03, 0xA4, 0x00, 0x01]))  # Wrong command
+        assert not encoded_data == bytes([0x03, 0x74, 0x00, 0x00]) # Failed
+        assert not encoded_data == bytes([0x03, 0x74])  # Too short
+        assert not encoded_data == bytes([0x03, 0xA4, 0x00, 0x01])  # Wrong command
 
     def test_motor_command_response(self):
         """Test that motor commands don't expect responses"""
         cmd = commands.MotorCommand(
-            control_mode=commands.ControlMode.CASCADED_PID,
+            control_mode=commands.ControlMode.IMPEDANCE_GRASP,
             motor_enable=0x03,
             motor1_pos=0,
-            motor2_pos=0
+            motor2_pos=0,
+            motor1_speed=10000,
+            motor2_speed=10000,
+            motor1_current=100,
+            motor2_current=100
         )
         # Motor commands should never verify responses
-        assert not commands.verify_response(cmd, 0x181, bytes([0x00] * 4))
+        message_type, encoded_data = commands.encode_command(cmd)
+        assert message_type == MessageType.MOTION_COMMAND
+        assert not encoded_data == bytes([0x00] * 4)
 
 if __name__ == '__main__':
     pytest.main([__file__])

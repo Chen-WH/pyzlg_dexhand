@@ -430,6 +430,7 @@ class ZCANWrapper(ZCANWrapperBase):
         sent = self.zcan.transmit_fd(
             self.device_type, self.device_index, channel, [message], 1
         )
+        time.sleep(0.001)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Transmit time: {time.time() - t:.3f}s")
 

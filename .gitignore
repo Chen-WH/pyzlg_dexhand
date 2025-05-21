@@ -142,3 +142,5 @@ dmypy.json
 # Project-specific
 pyzlg_dexhand.txt
 dexhand_logs/**
+analyze/
+CLAUDE.md

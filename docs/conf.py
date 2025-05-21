@@ -2,7 +2,7 @@
 project = "pyzlg_dexhand"
 copyright = "2024, DexRobot"
 author = "DexRobot"
-release = "0.1.0"
+release = "0.1.3"
 
 # conf.py
 

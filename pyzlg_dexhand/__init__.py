@@ -1,12 +1,15 @@
 # pyzlg_dexhand/__init__.py
 
+__version__ = "0.1.3"
+
 from .dexhand_interface import (
     LeftDexHand,
     RightDexHand,
     ControlMode,
     HandFeedback,
     JointFeedback,
-    StampedTactileFeedback,
+    StampedTouchFeedback,
+    JointCommand,
 )
 from .zcan_wrapper import ZCANWrapper, MockZCANWrapper
 from .dexhand_logger import DexHandLogger
@@ -20,5 +23,7 @@ __all__ = [
     'DexHandLogger',
     'HandFeedback',
     'JointFeedback',
-    'StampedTactileFeedback',
+    'StampedTouchFeedback',
+    'JointCommand',
+    '__version__',
 ]

@@ -3,14 +3,15 @@ from setuptools import setup, find_packages
 
 setup(
     name="pyzlg_dexhand",
-    version="0.1.0",
+    version="0.1.3",
     packages=find_packages(),
     install_requires=[
         "numpy",
         "pyyaml",
-        "ipython",
+        "ipython[all]",  # Includes necessary sqlite dependencies
         "matplotlib",
         "pandas",
+        "filterpy",
         "ros_compat @ git+https://gitee.com/dexrobot/ros_compat.git",
     ],
     extras_require={

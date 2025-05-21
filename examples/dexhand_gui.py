@@ -297,8 +297,8 @@ class DexHandControl(QMainWindow):
             # Send to hand
             self.current_hand.move_joints(**positions)
 
-            # Clear any errors
-            self.current_hand.clear_errors()
+            # Clear any errors - use_broadcast=False to avoid a known bug
+            self.current_hand.clear_errors(use_broadcast=False)
 
         except Exception as e:
             logger.error(f"Error sending joint commands: {e}")

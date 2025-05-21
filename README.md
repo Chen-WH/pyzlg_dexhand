@@ -123,21 +123,43 @@ python examples/ros_node/dexhand_ros.py
 
 # Run the demo publisher (for testing)
 python examples/ros_node/dexhand_ros_publisher_demo.py --hands right --cycle-time 3.0
+
+# Run continuous joint motion publisher (for testing)
+python examples/ros_node/continuous_joint_publisher.py --pattern sine --amplitude 30 --period 5
 ```
 
 Interface:
 
-| Topic (default)     | Type                     | Direction | Description                           |
-| ------------------- | ------------------------ | --------- | ------------------------------------- |
-| `/joint_commands`   | `sensor_msgs/JointState` | Input     | Joint position commands               |
-| `/joint_states`     | `sensor_msgs/JointState` | Output    | Joint position feedback (Coming soon) |
-| `/tactile_feedback` | TBD                      | Output    | Tactile sensor data (Coming soon)     |
+| Topic (default)            | Type                     | Direction | Description                    |
+| -------------------------- | ------------------------ | --------- | ------------------------------ |
+| `/left_hand/joint_commands`| `sensor_msgs/JointState` | Input     | Left hand joint commands       |
+| `/right_hand/joint_commands`| `sensor_msgs/JointState`| Input     | Right hand joint commands      |
+| `/left_hand/joint_states`  | `sensor_msgs/JointState` | Output    | Left hand joint feedback       |
+| `/right_hand/joint_states` | `sensor_msgs/JointState` | Output    | Right hand joint feedback      |
+| `/left_hand/touch_sensors`      | `Float64MultiArray`      | Output    | Left hand touch sensor data  |
+| `/right_hand/touch_sensors`     | `Float64MultiArray`      | Output    | Right hand touch sensor data |
+| `/left_hand/motor_feedback`     | `Float64MultiArray`      | Output    | Left hand detailed motor data  |
+| `/right_hand/motor_feedback`    | `Float64MultiArray`      | Output    | Right hand detailed motor data |
 
 Topic names configurable via `config/config.yaml`.
 
 | Service        | Type               | Description                     |
 | -------------- | ------------------ | ------------------------------- |
 | `/reset_hands` | `std_srvs/Trigger` | Reset hands to default position |
+
+**Message Format Details:**
+
+- **Input (JointState)**: Standard `sensor_msgs/JointState` message with `position` field containing desired joint angles in degrees.
+
+- **Touch Sensor Output (Float64MultiArray)**:
+  - Format: `[timestamp, normal_force, normal_force_delta, tangential_force, tangential_force_delta, direction, proximity, temperature, ...]`
+  - Structure: 5 fingers × 8 values per finger (40 total values)
+  - Direction values: 0-359 degrees (fingertip is 0°) or -1 for invalid readings
+
+- **Motor Feedback Output (Float64MultiArray)**:
+  - Format: `[timestamp, angle, encoder_position, current, velocity, error_code, impedance, ...]`
+  - Structure: 12 motors × 7 values per motor (84 total values)
+  - Error codes: 0 = no error
 
 Notes:
 
@@ -161,21 +183,29 @@ hand.move_joints(
     th_rot=30,  # Thumb rotation (0-150 degrees)
     th_mcp=45,  # Thumb MCP flexion (0-90 degrees)
     th_dip=45,  # Thumb coupled distal flexion
-    control_mode=ControlMode.CASCADED_PID
+    control_mode=ControlMode.CASCADED_PID,  # Control mode
+    use_broadcast=True  # Default: uses broadcast mode for more efficient control
 )
 
 # Get feedback
 feedback = hand.get_feedback()
 print(f"Thumb angle: {feedback.joints['th_rot'].angle}")
-print(f"Tactile force: {feedback.tactile['th'].normal_force}")
+print(f"Touch sensor force: {feedback.touch['th'].normal_force}")
 ```
 
 Notes:
 
+- Communication Modes
+  
+  - **Broadcast Mode** (Default): Sends a single CAN message to control all joints simultaneously. This is more efficient and reduces latency.
+  - **Per-Board Commands**: Sends individual commands to each board. This allows for more targeted control in specific use cases.
+
 - Control Modes
 
-  - `CASCADED_PID`: Provides precise position control with higher stiffness
+  - `CASCADED_PID` (Default): Provides precise position control with higher stiffness
   - `PROTECT_HALL_POSITION`: Offers smoother response but requires joints to be in zero position at power-on
+  - `MIT_TORQUE`: High-precision torque control, maintaining stable force after object contact. Allows for dynamic force adjustments while maintaining position tracking.
+  - `IMPEDANCE_GRASP`: Optimized for safe grasping, automatically detecting contact with objects and reducing force to prevent damage. Recommended for adaptive grasping of delicate objects.
 
 - Error Handling
 
@@ -235,7 +265,7 @@ logger.plot_session(show=True, save=True)
 Logs include:
 
 - Joint commands and feedback
-- Tactile sensor data
+- Touch sensor data
 - Error states
 - Timing information
 

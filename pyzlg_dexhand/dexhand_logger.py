@@ -14,8 +14,9 @@ from contextlib import contextmanager
 from .dexhand_interface import (
     ControlMode,
     HandFeedback,
-    StampedTactileFeedback,
+    StampedTouchFeedback,
     JointFeedback,
+    LogLevel,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ class FeedbackLogEntry(LogEntry):
     """Log entry for hand feedback"""
 
     joints: Dict[str, JointFeedback]  # Joint name to feedback
-    tactile: Dict[str, StampedTactileFeedback]  # Fingertip name to tactile data
+    touch: Dict[str, StampedTouchFeedback]  # Fingertip name to touch sensor data
 
 
 class LogWriter(threading.Thread):
@@ -111,11 +112,14 @@ class LogWriter(threading.Thread):
 class DexHandLogger:
     """Logger for dexterous hand commands and feedback with background writing"""
 
-    def __init__(self, log_dir: str = "dexhand_logs"):
+    def __init__(self, log_dir: str = "dexhand_logs", log_level: Optional[LogLevel] = LogLevel.INFO):
         """Initialize hand logger
 
         Args:
             log_dir: Directory to store log files
+            log_level: default for LogLevel.INFO:0,All control commands, parameter read and write commands, all feedback information, error messages;
+                        LogLevel.DEBUG:1,All parameter setting commands, parameter setting feedback information, all error messages;
+                        LogLevel.ERROR:2,All error messages;
         """
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -135,8 +139,10 @@ class DexHandLogger:
         self.buffer_lock = threading.Lock()
 
         self.start_time = time.time()
-        logger.info(f"Logging session started in {self.session_dir}")
-
+        self.log_level = log_level
+        if self.log_level <= LogLevel.INFO:
+            logger.info(f"Logging session started in {self.session_dir}")
+        
     def log_command(
         self,
         command_type: str,
@@ -186,7 +192,7 @@ class DexHandLogger:
             hand=hand,
             entry_type="feedback",
             joints=feedback.joints,
-            tactile=feedback.tactile,
+            touch=feedback.touch,
         )
 
         # Add to buffer thread-safely
@@ -200,7 +206,7 @@ class DexHandLogger:
         """Save session metadata
 
         Args:
-            metadata: Dictionary of metadata to save
+            metadata: Dicti= LogLevel.INFOonary of metadata to save
         """
         metadata_path = self.session_dir / "metadata.json"
         # Write metadata directly since this isn't in the critical path
@@ -283,29 +289,29 @@ class DexHandLogger:
             if save:
                 plt.savefig(self.session_dir / f"{hand}_joints.png")
 
-            # Plot tactile feedback
-            if any(entry.tactile for entry in feedback_buffers[hand]):
+            # Plot touch feedback
+            if any(entry.touch for entry in feedback_buffers[hand]):
                 plt.figure(figsize=(12, 8))
-                tactile_data = {}
+                touch_data = {}
 
-                # Collect tactile data
+                # Collect touch data
                 for entry in feedback_buffers[hand]:
                     t = entry.timestamp
-                    for finger, data in entry.tactile.items():
-                        if finger not in tactile_data:
-                            tactile_data[finger] = {
+                    for finger, data in entry.touch.items():
+                        if finger not in touch_data:
+                            touch_data[finger] = {
                                 "times": [],
                                 "normal_force": [],
                                 "tangential_force": [],
                             }
-                        tactile_data[finger]["times"].append(t)
-                        tactile_data[finger]["normal_force"].append(data.normal_force)
-                        tactile_data[finger]["tangential_force"].append(
+                        touch_data[finger]["times"].append(t)
+                        touch_data[finger]["normal_force"].append(data.normal_force)
+                        touch_data[finger]["tangential_force"].append(
                             data.tangential_force
                         )
 
-                # Plot each finger's tactile data
-                for finger, data in tactile_data.items():
+                # Plot each finger's touch data
+                for finger, data in touch_data.items():
                     plt.plot(
                         data["times"],
                         data["normal_force"],
@@ -321,20 +327,27 @@ class DexHandLogger:
 
                 plt.xlabel("Time (s)")
                 plt.ylabel("Force (N)")
-                plt.title(f"{hand.title()} Hand Tactile Feedback")
+                plt.title(f"{hand.title()} Hand Touch Feedback")
                 plt.legend()
                 plt.grid(True)
 
                 if save:
-                    plt.savefig(self.session_dir / f"{hand}_tactile.png")
+                    plt.savefig(self.session_dir / f"{hand}_touch.png")
 
             plt.close("all")
 
         if show:
             plt.show()
 
-    def close(self):
-        """Close the logger and save any remaining data"""
+    def close(self, log_level: Optional[LogLevel] = None):
+        """
+        Close the logger and save any remaining data
+
+        Args:
+            log_level: default for LogLevel.INFO:0,All control commands, parameter read and write commands, all feedback information, error messages;
+                        LogLevel.DEBUG:1,All parameter setting commands, parameter setting feedback information, all error messages;
+                        LogLevel.ERROR:2,All error messages;
+        """
         # Save summary statistics
         with self.buffer_lock:
             stats = {
@@ -355,8 +368,11 @@ class DexHandLogger:
 
         # Stop the writer thread and close files
         self.writer.stop()
-
-        logger.info(f"Logging session completed: {stats}")
+        if log_level is not None:
+            if log_level <= LogLevel.INFO:
+                logger.info(f"Logging session completed: {stats}")
+        elif self.log_level <= LogLevel.INFO:
+            logger.info(f"Logging session completed: {stats}")
 
         # Generate plots
         self.plot_session(show=False, save=True)
