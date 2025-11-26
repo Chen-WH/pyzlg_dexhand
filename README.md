@@ -56,6 +56,23 @@ Please refer to the following diagram:
 
    **You may need to log out and back in for the changes to take effect.**
 
+4. Grant the most permissive access rights to a USB device file in the system, allowing all users to read from, write to, and execute operations on it.
+
+   ```shell
+   (dexhand) dinglab102@dinglab102:~/Project/pyzlg_dexhand$ lsusb
+   Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+   Bus 005 Device 003: ID 275d:0ba6  USB OPTICAL MOUSE 
+   Bus 005 Device 002: ID 046d:c31c Logitech, Inc. Keyboard K120
+   Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+   Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+   Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+   Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+   Bus 001 Device 006: ID 3068:0009 ZLG USBCANFD-100U-mini
+   Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+   
+   (dexhand) dinglab102@dinglab102:~/Project/pyzlg_dexhand/examples$ sudo chmod 777 /dev/bus/usb/001/006
+   ```
+
 4. Edit `config/config.yaml` to match your hardware setup, especially **channels and ZCAN device type**.
 
 ## Usage Examples
